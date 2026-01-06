@@ -3,10 +3,17 @@ from .models import Category, Product
 from malls.serializers import MallSerializer
 
 class CategorySerializer(serializers.ModelSerializer):
+    product_count = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = Category
-        fields = "__all__"
-
+        fields = [
+            "id",
+            "name",
+            "slug",
+            "image",
+            "product_count",
+        ]
 
 class ProductSerializer(serializers.ModelSerializer):
     """Serializer for Product model (list view)"""

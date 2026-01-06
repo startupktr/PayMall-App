@@ -14,11 +14,11 @@ export default function HomeStack() {
         component={HomeScreen}
         options={{ title: "Nearby Malls" }}
       />
-      {/* <Stack.Screen
-        name="MallDetails"
+      <Stack.Screen
+        name="MallDetailsScreen"
         component={MallDetailsScreen}
         options={{ title: "Mall" }}
-      /> */}
+      />
     </Stack.Navigator>
   );
 }

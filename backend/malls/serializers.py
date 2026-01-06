@@ -6,7 +6,7 @@ class MallSerializer(serializers.ModelSerializer):
     """Serializer for Mall model"""
     class Meta:
         model = Mall
-        fields = ('id', 'name', 'location', 'description', 'image')
+        fields = "__all__"
 
 
 class OfferSerializer(serializers.ModelSerializer):

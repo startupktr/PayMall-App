@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,72 +6,111 @@ import {
   ActivityIndicator,
   Alert,
   TouchableOpacity,
-  ScrollView
+  ScrollView,
+  RefreshControl,
 } from "react-native";
 import * as Location from "expo-location";
 import api from "../api/axios";
 import HomeHeader from "../components/HomeHeader";
 import OfferCarousel from "../components/OfferCarousel";
 import MallCard from "../components/MallCard";
+import { GlobalOffer } from "../types/offer";
 
-
-type MallOffer = {
-  id: number;
-  title: string;
-  description: string;
-  image: string;
-  mall_id: number;
-  mall_name: string;
-};
+/* ================= TYPES ================= */
 
 type Mall = {
   id: number;
   name: string;
   address: string;
   image: string;
-  description: string,
+  description: string;
   distance: number;
 };
 
+/* ================= SCREEN ================= */
+
 export default function HomeScreen({ navigation }: any) {
   const [malls, setMalls] = useState<Mall[]>([]);
+  const [filteredMalls, setFilteredMalls] = useState<Mall[]>([]);
+  const [offers, setOffers] = useState<GlobalOffer[]>([]);
+
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [locationDenied, setLocationDenied] = useState(false);
   const [showAllMalls, setShowAllMalls] = useState(false);
+  const [search, setSearch] = useState("");
+
+  /* ================= INITIAL LOAD ================= */
 
   useEffect(() => {
-    requestLocation();
+    init();
   }, []);
 
-  // 📍 Ask for permission
-  const requestLocation = async () => {
-    try {
-      setLoading(true);              // 🔁 reset loader
-      setLocationDenied(false);      // 🔁 reset denied state
+  const init = async () => {
+    await ensureLocationAndFetch();
+    fetchMallOffers();
+  };
 
-      const { status } =
-        await Location.requestForegroundPermissionsAsync();
+  /* ================= LOCATION FLOW ================= */
+
+  const ensureLocationAndFetch = async () => {
+    try {
+      setLoading(true);
+      setLocationDenied(false);
+
+      const { status } = await Location.getForegroundPermissionsAsync();
 
       if (status !== "granted") {
-        setLocationDenied(true);
-        setLoading(false);
-        return;
+        const req = await Location.requestForegroundPermissionsAsync();
+        if (req.status !== "granted") {
+          setLocationDenied(true);
+          setLoading(false);
+          return;
+        }
       }
 
+      await fetchLocationAndMalls();
+    } catch (err) {
+      console.log("Location init error:", err);
+      setLoading(false);
+    }
+  };
+
+  const fetchLocationAndMalls = async () => {
+    try {
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
       });
 
       const { latitude, longitude } = location.coords;
-
       await fetchNearbyMalls(latitude, longitude);
-    } catch (error) {
-      console.log("Location error:", error);
+    } catch (err) {
+      console.log("Location fetch error:", err);
       setLoading(false);
     }
   };
 
-  const [offers, setOffers] = useState<MallOffer[]>([]);
+  /* ================= API ================= */
+
+  const fetchNearbyMalls = async (lat: number, lng: number) => {
+    try {
+      setRefreshing(true);
+
+      const res = await api.post("malls/nearby/", {
+        latitude: lat,
+        longitude: lng,
+      });
+
+      setMalls(res.data);
+      setFilteredMalls(res.data);
+    } catch (error) {
+      console.log("Mall API error:", error);
+      Alert.alert("Error", "Unable to fetch nearby malls");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   const fetchMallOffers = async () => {
     try {
@@ -82,49 +121,46 @@ export default function HomeScreen({ navigation }: any) {
     }
   };
 
+  /* ================= LOCAL SEARCH ================= */
+
   useEffect(() => {
-    fetchMallOffers();
-  }, []);
-
-
-  // 🌐 API call
-  const fetchNearbyMalls = async (lat: number, lng: number) => {
-    try {
-      const res = await api.post("malls/nearby/", {
-        latitude: lat,
-        longitude: lng
-      });
-      setMalls(res.data);
-    } catch (error) {
-      console.log("API error:", error);
-      Alert.alert("Error", "Unable to fetch nearby malls");
-    } finally {
-      setLoading(false);
+    if (!search.trim()) {
+      setFilteredMalls(malls);
+      return;
     }
-  };
 
-  // ⏳ Loader
+    const q = search.toLowerCase();
+    setFilteredMalls(
+      malls.filter((m) => m.name.toLowerCase().includes(q))
+    );
+  }, [search, malls]);
+
+  /* ================= LOADING STATES ================= */
+
   if (loading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#2563EB" />
-        <Text style={styles.loadingText}>Finding nearby malls...</Text>
+        <Text style={styles.loadingText}>
+          Finding nearby malls...
+        </Text>
       </View>
     );
   }
 
-  // 🚫 Permission denied UI
   if (locationDenied) {
     return (
       <View style={styles.center}>
-        <Text style={styles.errorTitle}>Location Permission Denied</Text>
+        <Text style={styles.errorTitle}>
+          Location Permission Denied
+        </Text>
         <Text style={styles.errorText}>
           Enable location to discover nearby malls
         </Text>
 
         <TouchableOpacity
           style={styles.retryBtn}
-          onPress={requestLocation}
+          onPress={ensureLocationAndFetch}
         >
           <Text style={styles.retryText}>Try Again</Text>
         </TouchableOpacity>
@@ -132,30 +168,42 @@ export default function HomeScreen({ navigation }: any) {
     );
   }
 
+  /* ================= RENDER ================= */
+
   return (
     <View style={styles.container}>
-      {/* Header (NO flex:1) */}
-      <HomeHeader />
+      <HomeHeader
+        showLocationBar={false}
+        showLocationTextBelowLogo
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search nearby malls..."
+      />
 
-      {/* Scrollable content */}
       <ScrollView
         contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={ensureLocationAndFetch}
+          />
+        }
         showsVerticalScrollIndicator={false}
       >
         {offers.length > 0 && (
           <OfferCarousel
             offers={offers}
             onPress={(mallId) =>
-              navigation.navigate("MallDetails", { mallId })
+              navigation.navigate("MallDetailsScreen", { mallId })
             }
           />
         )}
 
-        {/* 🏬 Malls Nearby */}
         <Text style={styles.sectionTitle}>Malls Nearby</Text>
+
         <View style={styles.grid}>
-          {malls
-            .slice(0, showAllMalls ? malls.length : 4)
+          {filteredMalls
+            .slice(0, showAllMalls ? filteredMalls.length : 4)
             .map((mall) => (
               <View key={mall.id} style={styles.gridItem}>
                 <MallCard
@@ -164,104 +212,60 @@ export default function HomeScreen({ navigation }: any) {
                   tagline={mall.description}
                   distance={mall.distance}
                   onPress={() =>
-                    navigation.navigate("MallDetails", { mallId: mall.id })
+                    navigation.navigate("MallDetailsScreen", {
+                      mallId: mall.id,
+                    })
                   }
                 />
               </View>
             ))}
         </View>
 
-        {/* 👇 View All only if more than 2 rows */}
-        {malls.length > 4 && (
+        {filteredMalls.length > 4 && (
           <TouchableOpacity
             style={styles.viewAllBtn}
-            onPress={() => setShowAllMalls(!showAllMalls)}
+            onPress={() => setShowAllMalls((p) => !p)}
           >
-            <Text style={styles.viewAllText}>{showAllMalls ? "Show Less" : "View All"}</Text>
+            <Text style={styles.viewAllText}>
+              {showAllMalls ? "Show Less" : "View All"}
+            </Text>
           </TouchableOpacity>
+        )}
+
+        {filteredMalls.length === 0 && (
+          <Text style={styles.empty}>No malls found</Text>
         )}
       </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F1F5F9",
-  },
+/* ================= STYLES ================= */
 
-  content: {
-    paddingHorizontal: 16,
-    paddingBottom: 30,
-  },
-  header: {
-    fontSize: 22,
-    fontWeight: "700",
-    marginBottom: 12,
-  },
-  card: {
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: "#F1F5F9",
-    marginBottom: 12,
-  },
-  mallName: {
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  mallAddress: {
-    marginTop: 4,
-    color: "#64748B",
-  },
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#F1F5F9" },
+  content: { paddingHorizontal: 16, paddingBottom: 30 },
+
   center: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: 24,
   },
-  loadingText: {
-    marginTop: 12,
-    color: "#475569",
-  },
-  errorTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    marginBottom: 8,
-  },
-  errorText: {
-    textAlign: "center",
-    color: "#64748B",
-    marginBottom: 20,
-  },
+
+  loadingText: { marginTop: 12, color: "#475569" },
+
+  errorTitle: { fontSize: 20, fontWeight: "600", marginBottom: 8 },
+  errorText: { textAlign: "center", color: "#64748B", marginBottom: 20 },
+
   retryBtn: {
     backgroundColor: "#2563EB",
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
   },
-  retryText: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  empty: {
-    textAlign: "center",
-    color: "#94A3B8",
-    marginTop: 40,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 10,
-    marginBottom: 8,
-  },
+  retryText: { color: "#fff", fontWeight: "600" },
 
-  viewAll: {
-    fontSize: 14,
-    color: "#2563EB",
-    fontWeight: "600",
-  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: "800",
@@ -275,21 +279,14 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "space-between",
   },
+  gridItem: { width: "48%" },
 
-  gridItem: {
-    width: "48%", // 2 per row
+  viewAllBtn: { marginTop: 10, alignSelf: "center" },
+  viewAllText: { fontSize: 14, color: "#2563EB", fontWeight: "700" },
+
+  empty: {
+    textAlign: "center",
+    marginTop: 40,
+    color: "#94A3B8",
   },
-
-  viewAllBtn: {
-    marginTop: 10,
-    alignSelf: "center",
-  },
-
-  viewAllText: {
-    fontSize: 14,
-    color: "#2563EB",
-    fontWeight: "700",
-  },
-
-
 });

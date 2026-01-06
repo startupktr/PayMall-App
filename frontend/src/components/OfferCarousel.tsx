@@ -6,17 +6,9 @@ import {
   Dimensions,
 } from "react-native";
 import OfferBanner from "./OfferBanner";
+import { Offer } from "../types/offer";
 
 const { width } = Dimensions.get("window");
-
-type Offer = {
-  id: number;
-  mall_id: number;
-  mall_name: string;
-  title: string;
-  description: string;
-  image: string;
-};
 
 type Props = {
   offers: Offer[];

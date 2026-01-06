@@ -1,10 +1,11 @@
 from rest_framework import status
 from rest_framework.response import Response
 from .models import Mall, Offer
-from .serializers import OfferSerializer
+from .serializers import MallSerializer
 import math
 from django.utils.timezone import now
 from rest_framework.views import APIView
+from django.shortcuts import get_object_or_404
 
 def haversine(lat1, lon1, lat2, lon2):
     R = 6371000
@@ -63,3 +64,9 @@ class MallOffersView(APIView):
         ]
 
         return Response(data)
+
+class MallView(APIView):
+    def get(self, request, mall_id):
+        mall = get_object_or_404(Mall, id=mall_id)
+        serializer = MallSerializer(mall)
+        return Response(serializer.data, status=status.HTTP_200_OK)

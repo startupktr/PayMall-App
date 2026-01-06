@@ -1,67 +1,144 @@
 import React from "react";
 import {
-    View,
-    Text,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    Image,
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-export default function HomeHeader() {
-    return (
-        <SafeAreaView edges={["top"]} style={styles.safe}>
-            <View style={styles.container}>
-                {/* 🔝 Top Bar */}
-                <View style={styles.topRow}>
-                    <Text style={styles.logo}>PayMall</Text>
+type HomeHeaderProps = {
+  showLocationBar?: boolean;
+  showLocationTextBelowLogo?: boolean;
+  locationTitle?: string;
 
-                    <View style={styles.topIcons}>
-                        <TouchableOpacity>
-                            <Ionicons
-                                name="notifications-outline"
-                                size={28}
-                                color="#334155"
-                            />
-                        </TouchableOpacity>
+  searchValue?: string;
+  onSearchChange?: (text: string) => void;
+  onSearchSubmit?: () => void;
+  searchPlaceholder?: string;
+  showSearch?: boolean; // 👈 NEW (optional)
+};
 
-                        <TouchableOpacity>
-                            <Image
-                                source={{ uri: "https://i.pravatar.cc/150?img=12" }}
-                                style={styles.avatar}
-                            />
-                        </TouchableOpacity>
-                    </View>
-                </View>
+export default function HomeHeader({
+  showLocationBar = true,
+  showLocationTextBelowLogo = false,
+  locationTitle = "Bangalore",
 
-                {/* 📍 Location */}
-                <TouchableOpacity style={styles.locationCard}>
-                    <Ionicons name="location-outline" size={18} color="#0F766E" />
-                    <View style={{ flex: 1 }}>
-                        <Text style={styles.locationTitle}>Bangalore</Text>
-                        <Text style={styles.locationSub}>
-                            BTM Layout, 560068
-                        </Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-                </TouchableOpacity>
+  searchValue = "",
+  onSearchChange,
+  onSearchSubmit,
+  searchPlaceholder = "Search",
+  showSearch = true,
+}: HomeHeaderProps) {
+  return (
+    <SafeAreaView edges={["top"]} style={styles.safe}>
+      <View style={styles.container}>
+        {/* 🔝 Top Bar */}
+        <View style={styles.topRow}>
+          <View>
+            <Text style={styles.logo}>PayMall</Text>
 
-                {/* 🔍 Search */}
-                <View style={styles.searchBox}>
-                    <Ionicons name="search-outline" size={18} color="#64748B" />
-                    <TextInput
-                        placeholder="Search anything..."
-                        placeholderTextColor="#64748B"
-                        style={styles.searchInput}
-                    />
-                    <Ionicons name="mic-outline" size={18} color="#0F766E" />
-                </View>
+            {showLocationTextBelowLogo && (
+              <View style={styles.inlineLocation}>
+                <Ionicons
+                  name="location-outline"
+                  size={14}
+                  color="#0F766E"
+                />
+                <Text style={styles.inlineLocationText}>
+                  {locationTitle}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.topIcons}>
+            <TouchableOpacity>
+              <Ionicons
+                name="notifications-outline"
+                size={28}
+                color="#334155"
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity>
+              <Image
+                source={{ uri: "https://i.pravatar.cc/150?img=12" }}
+                style={styles.avatar}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* 📍 Full Location Card */}
+        {showLocationBar && (
+          <TouchableOpacity style={styles.locationCard}>
+            <Ionicons
+              name="location-outline"
+              size={18}
+              color="#0F766E"
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.locationTitle}>
+                {locationTitle}
+              </Text>
             </View>
-        </SafeAreaView>
-    );
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color="#94A3B8"
+            />
+          </TouchableOpacity>
+        )}
+
+        {/* 🔍 Search */}
+        {showSearch && (
+          <View style={styles.searchBox}>
+            <Ionicons
+              name="search-outline"
+              size={18}
+              color="#64748B"
+            />
+
+            <TextInput
+              placeholder={searchPlaceholder}
+              placeholderTextColor="#64748B"
+              style={styles.searchInput}
+              value={searchValue}
+              editable={!!onSearchChange}
+              onChangeText={onSearchChange}
+              returnKeyType="search"
+              onSubmitEditing={onSearchSubmit}
+            />
+
+            {/* ❌ Clear button */}
+            {searchValue.length > 0 ? (
+              <TouchableOpacity
+                onPress={() => onSearchChange?.("")}
+              >
+                <Ionicons
+                  name="close-circle"
+                  size={18}
+                  color="#94A3B8"
+                />
+              </TouchableOpacity>
+            ) : (
+              <Ionicons
+                name="mic-outline"
+                size={18}
+                color="#0F766E"
+              />
+            )}
+          </View>
+        )}
+      </View>
+    </SafeAreaView>
+  );
 }
+
 
 const styles = StyleSheet.create({
     safe: {
@@ -72,13 +149,13 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingTop: 10,
         paddingBottom: 16,
-        backgroundColor: "#e0f3efff"
+        backgroundColor: "#e0f3efff",
     },
 
     /* Top Bar */
     topRow: {
         flexDirection: "row",
-        alignItems: "center",
+        alignItems: "flex-start",
         justifyContent: "space-between",
         marginBottom: 12,
     },
@@ -87,6 +164,19 @@ const styles = StyleSheet.create({
         fontWeight: "800",
         color: "#F97316",
     },
+
+    inlineLocation: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginTop: 4,
+        gap: 4,
+    },
+    inlineLocationText: {
+        fontSize: 12,
+        color: "#0F766E",
+        fontWeight: "600",
+    },
+
     topIcons: {
         flexDirection: "row",
         alignItems: "center",
@@ -100,7 +190,7 @@ const styles = StyleSheet.create({
         borderColor: "#CBD5E1",
     },
 
-    /* Location */
+    /* Location Card */
     locationCard: {
         flexDirection: "row",
         alignItems: "center",

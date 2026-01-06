@@ -2,11 +2,12 @@ from django.urls import path
 from .views import (
     NearbyMallView,
     MallOffersView,
+    MallView,
 )
 
 urlpatterns = [
     path('nearby/', NearbyMallView.as_view(), name='mall_list'),
-    # path("<int:mall_id>/offers/", MallOfferView.as_view()),
+    path("<int:mall_id>/", MallView.as_view()),
     path("offers/", MallOffersView.as_view()),
 
 ]
