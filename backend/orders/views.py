@@ -5,6 +5,7 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404
 import uuid
 from django.db.models import F
+from cart.models import Cart
 
 from products.models import Product
 from .models import Order, OrderItem

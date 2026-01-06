@@ -9,6 +9,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAuth } from "../context/AuthContext";
+import { useNavigation } from "@react-navigation/native";
 
 type HomeHeaderProps = {
   showLocationBar?: boolean;
@@ -33,6 +35,18 @@ export default function HomeHeader({
   searchPlaceholder = "Search",
   showSearch = true,
 }: HomeHeaderProps) {
+  const { logout } = useAuth();
+  const navigation = useNavigation<any>();
+
+  const handleLogout = async () => {
+    await logout();
+
+    navigation.reset({
+      index: 0,
+      routes: [{ name: "Auth" }],
+    });
+  };
+
   return (
     <SafeAreaView edges={["top"]} style={styles.safe}>
       <View style={styles.container}>
@@ -64,7 +78,7 @@ export default function HomeHeader({
               />
             </TouchableOpacity>
 
-            <TouchableOpacity>
+            <TouchableOpacity onPress={handleLogout}>
               <Image
                 source={{ uri: "https://i.pravatar.cc/150?img=12" }}
                 style={styles.avatar}

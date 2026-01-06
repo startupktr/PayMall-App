@@ -212,7 +212,7 @@ export default function HomeScreen({ navigation }: any) {
                   tagline={mall.description}
                   distance={mall.distance}
                   onPress={() =>
-                    navigation.navigate("MallDetailsScreen", {
+                    navigation.navigate("MallDetails", {
                       mallId: mall.id,
                     })
                   }

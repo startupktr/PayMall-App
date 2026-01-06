@@ -5,7 +5,7 @@ from django.conf.urls.static import static
 
 # API URL patterns
 api_urlpatterns = [
-    path('users/', include('accounts.urls')),
+    path('accounts/', include('accounts.urls')),
     path('cart/', include('cart.urls')),
     path('malls/', include('malls.urls')),
     path('orders/', include('orders.urls')),

@@ -1,12 +1,14 @@
 import React from 'react';
 import RootNavigator from './src/navigation/RootNavigator';
 import { SafeAreaProvider } from "react-native-safe-area-context";
-
+import { AuthProvider } from "./src/context/AuthContext";
 
 const App = () => {
   return (
     <SafeAreaProvider>
-      <RootNavigator />
+      <AuthProvider>
+        <RootNavigator />
+      </AuthProvider>
     </SafeAreaProvider>
   );
 };

@@ -1,5 +1,5 @@
 import { createStackNavigator } from "@react-navigation/stack";
-import BottomTabNavigator from "./BottomTabNavigator";
+import BottomTabNavigator from "./MainTabs";
 
 const Stack = createStackNavigator<any, any>();
 

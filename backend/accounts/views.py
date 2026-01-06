@@ -16,37 +16,15 @@ from .serializers import (
 User = get_user_model()
 
 class LoginView(TokenObtainPairView):
-    """
-    LOGIN
-    - Validates credentials
-    - Returns access token + user
-    - Stores refresh token in HttpOnly cookie
-    """
     serializer_class = CustomTokenObtainPairSerializer
 
-    def post(self, request, *args, **kwargs):
-        response = super().post(request, *args, **kwargs)
+class MeView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
 
-        refresh = response.data.pop("refresh")
-
-        response.set_cookie(
-            key="refresh_token",
-            value=refresh,
-            httponly=True,
-            secure=True,          # HTTPS only in production
-            samesite="Strict",    # CSRF protection
-            max_age=60 * 60 * 24  # 1 day
-        )
-        return response
-
+    def get(self, request):
+        return Response(UserSerializer(request.user).data)
 
 class UserRegistrationView(APIView):
-    """
-    REGISTER
-    - Creates user
-    - Auto-login
-    - Sets refresh token in HttpOnly cookie
-    """
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
@@ -56,35 +34,19 @@ class UserRegistrationView(APIView):
         user = serializer.save()
         refresh = RefreshToken.for_user(user)
 
-        response = Response(
-            {
-                "access": str(refresh.access_token),
-                "user": UserSerializer(user).data
-            },
-            status=status.HTTP_201_CREATED
-        )
-
-        response.set_cookie(
-            key="refresh_token",
-            value=str(refresh),
-            httponly=True,
-            secure=True,
-            samesite="Strict",
-            max_age=60 * 60 * 24
-        )
-        return response
+        return Response({
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "user": UserSerializer(user).data
+        }, status=201)
 
 
-class RefreshFromCookie(APIView):
-    """
-    REFRESH TOKEN
-    - Uses HttpOnly cookie
-    - Returns new access token
-    """
+class RefreshView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        refresh = request.COOKIES.get("refresh_token")
+        refresh = request.data.get("refresh")
+
         if not refresh:
             return Response({"detail": "No refresh token"}, status=401)
 
@@ -96,23 +58,17 @@ class RefreshFromCookie(APIView):
 
 
 class LogoutView(APIView):
-    """
-    LOGOUT
-    - Blacklists refresh token
-    - Deletes refresh cookie
-    """
     permission_classes = [permissions.IsAuthenticated]
 
+    # def post(self, request):
+    #     refresh = request.data.get("refresh")
+        # if refresh:
+        #     RefreshToken(refresh).blacklist()
+
+    #     return Response({"message": "Logged out"})
+
     def post(self, request):
-        refresh = request.COOKIES.get("refresh_token")
-
-        if refresh:
-            try:
-                RefreshToken(refresh).blacklist()
-            except Exception:
-                pass
-
-        response = Response({"message": "Logged out successfully"})
+        response = Response({"message": "Logged out"})
         response.delete_cookie("refresh_token")
         return response
 

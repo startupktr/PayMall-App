@@ -1,21 +1,35 @@
-import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-
 import SplashScreen from "../screens/SplashScreen";
 import AuthStack from "./AuthStack";
-import BottomTabNavigator from "./BottomTabNavigator";
+import MainTabs from "./MainTabs";
+import { RootStackParamList } from "../types/navigation";
+import { useAuth } from "../context/AuthContext";
 
-const Stack = createNativeStackNavigator<any, any>();
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
+  const { loading } = useAuth();
+
+  if (loading) {
+    return null; // Splash handles UI
+  }
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator
+        id="RootStack"
+        screenOptions={{ headerShown: false }}
+      >
         <Stack.Screen name="Splash" component={SplashScreen} />
-        <Stack.Screen name="Auth" component={AuthStack} />
-        <Stack.Screen name="Main" component={BottomTabNavigator} />
+        <Stack.Screen name="Main" component={MainTabs} />
+        <Stack.Screen
+          name="Auth"
+          component={AuthStack}
+          options={{ presentation: "modal" }} // 👈 login overlays app
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
+
