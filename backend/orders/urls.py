@@ -1,10 +1,14 @@
 from django.urls import path
 from .views import (
     OrderCreateView,
-    OrderListView
+    OrderDetailView,
+    OrderListView,
+    OrderCancelView
 )
 
 urlpatterns = [
-    path("create/", OrderCreateView.as_view()),
     path("list/", OrderListView.as_view()),
+    path("create/", OrderCreateView.as_view()),
+    path("<int:pk>/", OrderDetailView.as_view()),
+    path("<int:pk>/cancel/", OrderCancelView.as_view()),
 ]

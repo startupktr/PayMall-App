@@ -41,41 +41,60 @@ class OrderCreateView(APIView):
 
     @transaction.atomic
     def post(self, request):
-        cart = Cart.objects.select_for_update().get(user=request.user)
+        
+        cart = (
+            Cart.objects
+            .select_for_update()
+            .filter(user=request.user, status="ACTIVE")
+            .first()
+        )
+        
+        if not cart or not cart.items.exists():
+            return Response({"error": "Cart is empty"}, status=400)
 
-        if not cart.items.exists():
-            return Response({"error": "Empty cart"}, status=400)
+        # 🔒 Prevent duplicate order
+        existing = Order.objects.filter(
+            user=request.user,
+            status="PAYMENT_PENDING"
+        ).first()
 
+        if existing:
+            return Response(
+                OrderDetailSerializer(existing).data,
+                status=status.HTTP_200_OK
+            )
+        
         order = Order.objects.create(
             user=request.user,
-            mall=cart.items.first().product.mall,
-            order_number=f"ORD-{uuid.uuid4().hex[:8].upper()}",
-            payment_method=request.data["payment_method"],
+            mall=cart.mall,
+            order_number=f"ORD-{uuid.uuid4().hex[:10].upper()}",
+            status="PAYMENT_PENDING",
+            payment_status="PENDING",
             subtotal=cart.subtotal,
             tax=cart.tax_amount,
             total=cart.total_amount,
         )
 
         for item in cart.items.select_related("product"):
-            product = Product.objects.select_for_update().get(pk=item.product.pk)
-            if product.stock_quantity < item.quantity:
-                raise Exception("Stock error")
-
-            product.stock_quantity = F("stock_quantity") - item.quantity
-            product.save()
-
             OrderItem.objects.create(
                 order=order,
-                product=product,
-                product_name=product.name,
-                product_price=product.price,
-                product_barcode=product.barcode,
+                product=item.product,
+                product_name=item.product.name,
+                product_price=item.product.price,
+                product_barcode=item.product.barcode,
                 quantity=item.quantity,
                 total_price=item.total_price,
             )
 
-        cart.items.all().delete()
-        return Response(OrderDetailSerializer(order).data, status=201)
+        # 🔒 Lock cart
+        cart.status = "CONVERTED"
+        cart.save()
+
+        return Response(
+            OrderDetailSerializer(order).data,
+            status=status.HTTP_201_CREATED
+        )
+
 
 class OrderInvoiceView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -114,20 +133,13 @@ class OrderInvoiceView(APIView):
 
         return response
     
-class CancelOrderView(APIView):
+class OrderCancelView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, pk):
-        order = get_object_or_404(Order, pk=pk, user=request.user)
-
-        if order.status != "PENDING":
-            return Response(
-                {"error": "Order cannot be cancelled"},
-                status=400
-            )
+        order = get_object_or_404(Order, pk=pk, user=request.user, status="PAYMENT_PENDING")
 
         order.status = "CANCELLED"
-        order.payment_status = "REFUNDED" if order.payment_status == "PAID" else order.payment_status
         order.save()
 
         return Response({"success": True})

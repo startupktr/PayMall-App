@@ -2,15 +2,22 @@ from django.db import models
 from django.conf import settings
 from malls.models import Mall
 from products.models import Product
+from django.utils import timezone
+from datetime import timedelta
 
 User = settings.AUTH_USER_MODEL
 
+def get_payment_expiry():
+    return timezone.now() + timedelta(minutes=15)
+
 class Order(models.Model):
     ORDER_STATUS = (
-        ('PENDING', 'Pending'),
-        ('PROCESSING', 'Processing'),
-        ('COMPLETED', 'Completed'),
+        ('CREATED', 'Created'),              # order exists
+        ('PAYMENT_PENDING', 'Payment Pending'),
+        ('PAID', 'Paid'),
+        ('FULFILLED', 'Fulfilled'),
         ('CANCELLED', 'Cancelled'),
+        ('EXPIRED', 'Expired'),
     )
     
     PAYMENT_STATUS = (
@@ -30,18 +37,32 @@ class Order(models.Model):
     mall = models.ForeignKey(Mall, on_delete=models.SET_NULL, null=True, related_name='orders')
     order_number = models.CharField(max_length=20, unique=True)
     
-    status = models.CharField(max_length=20, choices=ORDER_STATUS, default='PENDING')
+    status = models.CharField(max_length=20, choices=ORDER_STATUS, default='CREATED')
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS, default='PENDING')
-    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD)
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD, null=True, blank=True)
     
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
     tax = models.DecimalField(max_digits=10, decimal_places=2)
     total = models.DecimalField(max_digits=10, decimal_places=2)
     
+    payment_gateway_order_id = models.CharField(
+        max_length=100, null=True, blank=True
+    )
+    payment_reference = models.CharField(
+        max_length=100, null=True, blank=True
+    )
+    
+    payment_expires_at = models.DateTimeField(default=get_payment_expiry)
     is_paid = models.BooleanField(default=False)
     is_exited = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user", "status"]),
+            models.Index(fields=["order_number"]),
+        ]
 
     def __str__(self):
         return f"Order #{self.order_number} - {self.user.email}"
@@ -69,3 +90,8 @@ class ExitOTP(models.Model):
     otp = models.CharField(max_length=6)
     is_used = models.BooleanField(default=False)
     expires_at = models.DateTimeField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["order"], name="unique_exit_otp_per_order")
+        ]

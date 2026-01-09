@@ -17,9 +17,12 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
+import { useCart } from "../context/CartContext";
+
 
 export default function LoginScreen({ navigation }: any) {
   const { login } = useAuth();
+  const { fetchCart } = useCart();
   const scheme = useColorScheme();
   const isDark = scheme === "dark";
 
@@ -34,7 +37,8 @@ export default function LoginScreen({ navigation }: any) {
     try {
       setLoading(true);
       await login(email.trim(), password);
-
+      fetchCart();
+      
       navigation.reset({
         index: 0,
         routes: [{ name: "Main" }],

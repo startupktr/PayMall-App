@@ -7,12 +7,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation, useRoute } from "@react-navigation/native";
 
 import HomeStack from "./HomeStack";
-import CartScreen from "../screens/CartScreen";
 import OrdersScreen from "../screens/OrdersScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import ScannerScreen from "../screens/ScannerScreen";
 import RequireAuth from "../components/RequireAuth";
-import { MainTabParamList } from "../types/navigation"; 
+import { MainTabParamList } from "../types/navigation";
+import { useCart } from "../context/CartContext";
+import CartStack from "./CartStack";
+import OrderStack from "./OrderStack"
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -20,6 +22,7 @@ export default function MainTabs() {
   const insets = useSafeAreaInsets();
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
+  const { count } = useCart();
 
   useEffect(() => {
     if (route.params?.redirectTo) {
@@ -60,10 +63,10 @@ export default function MainTabs() {
           let iconName: any;
 
           if (route.name === "HomeTab") iconName = "home";
-          else if (route.name === "Orders") iconName = "receipt";
+          else if (route.name === "OrderTab") iconName = "receipt";
           else if (route.name === "Scan") iconName = "scan";
-          else if (route.name === "Cart") iconName = "cart";
-          else if (route.name === "Profile") iconName = "person";
+          else if (route.name === "CartTab") iconName = "cart";
+          else if (route.name === "Account") iconName = "person";
 
           return (
             <View style={styles.iconWrapper}>
@@ -87,12 +90,9 @@ export default function MainTabs() {
       />
 
       <Tab.Screen
-        name="Orders"
-        children={() => (
-          <RequireAuth>
-            <OrdersScreen />
-          </RequireAuth>
-        )}
+        name="OrderTab"
+        component={OrderStack}
+        options={{ title: "Orders" }}
       />
 
       <Tab.Screen
@@ -101,16 +101,22 @@ export default function MainTabs() {
       />
 
       <Tab.Screen
-        name="Cart"
-        children={() => (
-          <RequireAuth>
-            <CartScreen />
-          </RequireAuth>
-        )}
+        name="CartTab"
+        component={CartStack}
+        options={{
+          title: "Cart",
+          tabBarBadge: count > 0 ? count : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: "#EF4444",
+            color: "#fff",
+            fontSize: 12,
+            fontWeight: "700",
+          },
+        }}
       />
 
       <Tab.Screen
-        name="Profile"
+        name="Account"
         children={() => (
           <RequireAuth>
             <ProfileScreen />

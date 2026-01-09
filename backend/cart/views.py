@@ -33,14 +33,14 @@ class AddToCartView(APIView):
         quantity = int(request.data.get("quantity", 1))
 
         try:
-            product = Product.objects.get(id=product_id, is_active=True)
+            product = Product.objects.get(id=product_id, is_available=True)
         except Product.DoesNotExist:
             return Response(
                 {"error": "Product not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        if product.stock < quantity:
+        if product.stock_quantity < quantity:
             return Response(
                 {"error": "Insufficient stock"},
                 status=status.HTTP_400_BAD_REQUEST
@@ -54,7 +54,7 @@ class AddToCartView(APIView):
         )
 
         if not created:
-            if cart_item.quantity + quantity > product.stock:
+            if cart_item.quantity + quantity > product.stock_quantity:
                 return Response(
                     {"error": "Stock limit exceeded"},
                     status=status.HTTP_400_BAD_REQUEST
@@ -92,7 +92,7 @@ class CartItemUpdateView(APIView):
             item.delete()
             return Response({"message": "Item removed"})
 
-        if quantity > item.product.stock:
+        if quantity > item.product.stock_quantity:
             return Response(
                 {"error": "Insufficient stock"},
                 status=status.HTTP_400_BAD_REQUEST

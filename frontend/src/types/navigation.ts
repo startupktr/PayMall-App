@@ -7,15 +7,16 @@ export type RootStackParamList = {
     redirectParams?: object;
   } | undefined;
   Main: undefined;
+  ProductDetails: undefined;
 };
 
 /* ================= TABS ================= */
 
 export type MainTabParamList = {
   HomeTab: undefined;
-  Cart: undefined;
-  Orders: undefined;
-  Profile: undefined;
+  CartTab: undefined;
+  OrderTab: undefined;
+  Account: undefined;
   Scan: undefined;
 };
 

@@ -5,6 +5,7 @@ import AuthStack from "./AuthStack";
 import MainTabs from "./MainTabs";
 import { RootStackParamList } from "../types/navigation";
 import { useAuth } from "../context/AuthContext";
+import ProductDetailsScreen from "../screens/ProductDetailsScreen";
 
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -28,6 +29,11 @@ export default function RootNavigator() {
           component={AuthStack}
           options={{ presentation: "modal" }} // 👈 login overlays app
         />
+        <Stack.Screen
+          name="ProductDetails"
+          component={ProductDetailsScreen}
+        />
+
       </Stack.Navigator>
     </NavigationContainer>
   );

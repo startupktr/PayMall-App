@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ import HomeHeader from "../components/HomeHeader";
 import OfferCarousel from "../components/OfferCarousel";
 import MallCard from "../components/MallCard";
 import { GlobalOffer } from "../types/offer";
+import { useFocusEffect } from "@react-navigation/native";
+import { useMall } from "../context/MallContext";
 
 /* ================= TYPES ================= */
 
@@ -39,8 +41,15 @@ export default function HomeScreen({ navigation }: any) {
   const [locationDenied, setLocationDenied] = useState(false);
   const [showAllMalls, setShowAllMalls] = useState(false);
   const [search, setSearch] = useState("");
+  const { setSelectedMall } = useMall();
 
   /* ================= INITIAL LOAD ================= */
+  useFocusEffect(
+    useCallback(() => {
+      // User is on Home → no mall selected
+      setSelectedMall(null);
+    }, [])
+  );
 
   useEffect(() => {
     init();
@@ -68,7 +77,7 @@ export default function HomeScreen({ navigation }: any) {
           return;
         }
       }
-
+      
       await fetchLocationAndMalls();
     } catch (err) {
       console.log("Location init error:", err);
@@ -79,7 +88,7 @@ export default function HomeScreen({ navigation }: any) {
   const fetchLocationAndMalls = async () => {
     try {
       const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
+        accuracy: Location.Accuracy.Balanced,
       });
 
       const { latitude, longitude } = location.coords;

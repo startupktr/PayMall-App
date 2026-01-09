@@ -5,8 +5,6 @@ from .views import (
     RefreshView,
     UserRegistrationView,
     UserProfileView,
-    PaymentMethodListView,
-    PaymentMethodDetailView,
     LogoutView
 )
 
@@ -20,8 +18,5 @@ urlpatterns = [
     
     # User profile
     path('profile/', UserProfileView.as_view(), name='user_profile'),
-    
-    # Payment methods
-    path('payment-methods/', PaymentMethodListView.as_view(), name='payment_method_list'),
-    path('payment-methods/<int:pk>/', PaymentMethodDetailView.as_view(), name='payment_method_detail'),
+   
 ]

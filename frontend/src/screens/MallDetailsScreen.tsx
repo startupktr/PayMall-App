@@ -17,6 +17,7 @@ import HomeHeader from "../components/HomeHeader";
 import api from "../api/axios";
 import OfferCarousel from "../components/OfferCarousel";
 import { Offer } from "../types/offer";
+import { useMall } from "../context/MallContext";
 
 /* ================= TYPES ================= */
 
@@ -41,7 +42,7 @@ const SORT_OPTIONS = [
 
 /* ================= SCREEN ================= */
 
-export default function MallDetailsScreen({ route }: any) {
+export default function MallDetailsScreen({ route, navigation }: any) {
   const { mallId } = route.params;
 
   /* ---------- DATA ---------- */
@@ -57,6 +58,7 @@ export default function MallDetailsScreen({ route }: any) {
   const [sortOpen, setSortOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [mall, setMall] = useState<any>(null);
+  const { setSelectedMall } = useMall();
 
   /* ================= INITIAL LOAD (ONCE) ================= */
 
@@ -66,6 +68,15 @@ export default function MallDetailsScreen({ route }: any) {
     fetchMallOffers();
     fetchProducts("__all__", "popular");
   }, []);
+
+  useEffect(() => {
+    if (mall) {
+      setSelectedMall({
+        id: mall.id,
+        name: mall.name,
+      });
+    }
+  }, [mall]);
 
   /* ================= API ================= */
 

@@ -7,13 +7,24 @@ from decimal import Decimal
 User = settings.AUTH_USER_MODEL
 
 class Cart(models.Model):
+    CART_STATUS = (
+        ("ACTIVE", "Active"),
+        ("CONVERTED", "Converted to Order"),
+        ("ABANDONED", "Abandoned"),
+    )
+
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     mall = models.ForeignKey(Mall, on_delete=models.CASCADE)
+    status = models.CharField(
+        max_length=20,
+        choices=CART_STATUS,
+        default="ACTIVE"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        unique_together = ("user", "mall")
+        unique_together = ("user", "mall", "status")
     
     @property
     def total_items(self):
@@ -31,7 +42,7 @@ class Cart(models.Model):
     @property
     def total_amount(self):
         if self.subtotal:
-            return self.subtotal + self.tax_amount - (self.subtotal * 1/10) # Discount 10%
+            return self.subtotal + self.tax_amount
         else:
             return 0
 
