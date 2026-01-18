@@ -1,7 +1,12 @@
 from django.db import models
+import uuid
+
 
 class Mall(models.Model):
     """Model to represent different malls listed in the application"""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
     address = models.TextField()
@@ -23,7 +28,26 @@ class Mall(models.Model):
         return self.name
     
 
+class MallStaff(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    user = models.ForeignKey("accounts.User", on_delete=models.CASCADE)
+    mall = models.ForeignKey(Mall, on_delete=models.CASCADE)
+
+    role = models.CharField(
+        max_length=30,
+        choices=[("MALL_ADMIN", "Mall Admin")]
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("user", "mall")
+    
+
 class Offer(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
     mall = models.ForeignKey(Mall, on_delete=models.CASCADE, related_name="offers")
     title = models.CharField(max_length=255)
     description = models.TextField()

@@ -10,21 +10,13 @@ type MallContextType = {
   setSelectedMall: (mall: Mall | null) => void;
 };
 
-const MallContext = createContext<MallContextType>(
-  {} as MallContextType
-);
+const MallContext = createContext<MallContextType>({} as MallContextType);
 
-export const MallProvider = ({
-  children,
-}: {
-  children: React.ReactNode;
-}) => {
+export const MallProvider = ({ children }: { children: React.ReactNode }) => {
   const [selectedMall, setSelectedMall] = useState<Mall | null>(null);
 
   return (
-    <MallContext.Provider
-      value={{ selectedMall, setSelectedMall }}
-    >
+    <MallContext.Provider value={{ selectedMall, setSelectedMall }}>
       {children}
     </MallContext.Provider>
   );

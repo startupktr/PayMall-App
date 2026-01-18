@@ -38,5 +38,4 @@ frontend/*.env
 .DS_Store
 Thumbs.db
 venv
-abc.txt
-bkp
+test.txt

@@ -1,8 +1,12 @@
 from django.db import models
 from malls.models import Mall
 from django.utils.text import slugify
+import uuid
+from decimal import Decimal
 
 class Category(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
     name = models.CharField(max_length=100)
     slug = models.SlugField(max_length=120, unique=True, blank=True)
     description = models.TextField(blank=True, null=True)
@@ -26,6 +30,17 @@ class Category(models.Model):
 
 class Product(models.Model):
     """Model to store product information"""
+
+    PRODUCT_STATUS = (
+        ("DRAFT", "Draft"),
+        ("PENDING_APPROVAL", "Pending Approval"),
+        ("ACTIVE", "Active"),
+        ("REJECTED", "Rejected"),
+        ("INACTIVE", "Inactive"),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
     name = models.CharField(max_length=200)
     barcode = models.CharField(max_length=50, unique=True)
     description = models.TextField(blank=True, null=True)
@@ -40,8 +55,35 @@ class Product(models.Model):
     stock_quantity = models.PositiveIntegerField(default=0)
     is_available = models.BooleanField(default=True)
     
+    gst_rate = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"))
+    hsn_code = models.CharField(max_length=20, null=True, blank=True)
+
+     # 🔥 WORKFLOW FIELDS
+    status = models.CharField(
+        max_length=20,
+        choices=PRODUCT_STATUS,
+        default="DRAFT",
+    )
+    approved_by = models.ForeignKey(
+        "accounts.User",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="approved_products",
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True, null=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("barcode", "mall")
+        indexes = [
+            models.Index(fields=["mall", "is_available"]),
+            models.Index(fields=["barcode", "mall"]),
+            models.Index(fields=["created_at"]),
+        ]
     
     def save(self, *args, **kwargs):
         # Calculate discount percentage if not provided
@@ -52,3 +94,13 @@ class Product(models.Model):
     
     def __str__(self):
         return f"{self.name} - {self.barcode}"
+    
+class InventoryAlert(models.Model):
+    product = models.OneToOneField(
+        Product, on_delete=models.CASCADE, related_name="inventory_alert"
+    )
+    threshold = models.PositiveIntegerField(default=10)
+    is_triggered = models.BooleanField(default=False)
+    triggered_at = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)

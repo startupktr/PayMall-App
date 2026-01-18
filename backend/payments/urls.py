@@ -2,6 +2,7 @@ from django.urls import path
 from .views import (
     InitiatePaymentView,
     PaymentSuccessView,
+    PaymentFailedView,
     PaymentMethodListView,
     PaymentMethodDetailView
 )
@@ -9,6 +10,7 @@ from .views import (
 urlpatterns = [
     path("initiate/", InitiatePaymentView.as_view()),
     path("success/", PaymentSuccessView.as_view()),
+    path("failed/", PaymentFailedView.as_view()),
 
     # Payment methods
     path('payment-methods/', PaymentMethodListView.as_view(), name='payment_method_list'),

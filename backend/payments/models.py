@@ -10,7 +10,7 @@ class PaymentMethod(models.Model):
         ('CASH', 'Cash Payment'),
     )
     
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user')
+    user = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name='payment_methods')
     payment_type = models.CharField(max_length=10, choices=PAYMENT_TYPES)
     
     # For credit cards (masked for security)
@@ -29,18 +29,15 @@ class PaymentMethod(models.Model):
 
 
 class Payment(models.Model):
-    order = models.OneToOneField(Order, on_delete=models.CASCADE)
-    provider = models.CharField(max_length=50)  # razorpay / phonepe
-    payment_id = models.CharField(max_length=100, blank=True, null=True)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-    payment_method = models.ForeignKey(PaymentMethod, on_delete=models.CASCADE, related_name='payment_methods', null=True, blank=True)
-    status = models.CharField(
-        max_length=20,
-        choices=[
-            ("PENDING", "PENDING"),
-            ("SUCCESS", "SUCCESS"),
-            ("FAILED", "FAILED"),
-        ],
-        default="PENDING"
+    PAYMENT_STATUS = (
+        ("PENDING", "Pending"),
+        ("SUCCESS", "Success"),
+        ("FAILED", "Failed"),
     )
+
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="payments")
+    provider = models.CharField(max_length=50)  # razorpay / phonepe
+    gateway_payment_id = models.CharField(max_length=100, blank=True, null=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=20, choices=PAYMENT_STATUS, default="PENDING")
     created_at = models.DateTimeField(auto_now_add=True)

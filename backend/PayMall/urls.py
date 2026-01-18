@@ -16,6 +16,9 @@ api_urlpatterns = [
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include(api_urlpatterns)),  # All API endpoints under /api/
+    path("api/admin/", include("products.admin_urls")),
+    path("api/admin/malls/", include("malls.admin_urls")),
+
 ]
 
 # Serve media files in development

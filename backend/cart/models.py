@@ -13,7 +13,7 @@ class Cart(models.Model):
         ("ABANDONED", "Abandoned"),
     )
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey("accounts.User", on_delete=models.CASCADE)
     mall = models.ForeignKey(Mall, on_delete=models.CASCADE)
     status = models.CharField(
         max_length=20,
@@ -25,6 +25,9 @@ class Cart(models.Model):
     
     class Meta:
         unique_together = ("user", "mall", "status")
+        indexes = [
+            models.Index(fields=["user", "status"]),
+        ]
     
     @property
     def total_items(self):
@@ -32,19 +35,11 @@ class Cart(models.Model):
     
     @property
     def subtotal(self):
-        return sum(item.total_price for item in self.items.all())
-    
-    @property
-    def tax_amount(self):
-        # Assuming a fixed tax rate of 18% (can be made configurable)
-        return round(self.subtotal * Decimal('0.18'), 2)
+        return sum((item.total_price for item in self.items.all()), Decimal("0.00"))
     
     @property
     def total_amount(self):
-        if self.subtotal:
-            return self.subtotal + self.tax_amount
-        else:
-            return 0
+        return self.subtotal
 
     def __str__(self):
         return f"{self.user} - {self.mall}"
@@ -65,5 +60,5 @@ class CartItem(models.Model):
     
     @property
     def total_price(self):
-        return self.product.price * self.quantity
+        return (self.product.price * self.quantity)
 

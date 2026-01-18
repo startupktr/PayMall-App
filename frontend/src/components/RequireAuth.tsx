@@ -1,8 +1,8 @@
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useEffect } from "react";
-import { RootStackParamList } from "../types/navigation"
+import { RootStackParamList } from "@/types/navigation"
 
 type RootNavProp = NativeStackNavigationProp<RootStackParamList>;
 

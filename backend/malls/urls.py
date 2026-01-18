@@ -7,7 +7,7 @@ from .views import (
 
 urlpatterns = [
     path('nearby/', NearbyMallView.as_view(), name='mall_list'),
-    path("<int:mall_id>/", MallView.as_view()),
+    path("<uuid:mall_id>/", MallView.as_view()),
     path("offers/", MallOffersView.as_view()),
-
+    
 ]

@@ -16,7 +16,7 @@ export type MainTabParamList = {
   HomeTab: undefined;
   CartTab: undefined;
   OrderTab: undefined;
-  Account: undefined;
+  AccountTab: undefined;
   Scan: undefined;
 };
 
@@ -27,4 +27,6 @@ export type HomeStackParamList = {
   MallDetails: {
     mallId: number;
   };
+  MallProductDetails: { productId: number; mallId?: number };
+  Profile: undefined;
 };

@@ -7,14 +7,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation, useRoute } from "@react-navigation/native";
 
 import HomeStack from "./HomeStack";
-import OrdersScreen from "../screens/OrdersScreen";
-import ProfileScreen from "../screens/ProfileScreen";
-import ScannerScreen from "../screens/ScannerScreen";
-import RequireAuth from "../components/RequireAuth";
-import { MainTabParamList } from "../types/navigation";
-import { useCart } from "../context/CartContext";
+import ScannerScreen from "@/screens/scan/ScannerScreen";
+import { MainTabParamList } from "@/types/navigation";
+import { useCart } from "@/context/CartContext";
 import CartStack from "./CartStack";
 import OrderStack from "./OrderStack"
+import AccountStack from "./AccountStack"
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -66,7 +64,7 @@ export default function MainTabs() {
           else if (route.name === "OrderTab") iconName = "receipt";
           else if (route.name === "Scan") iconName = "scan";
           else if (route.name === "CartTab") iconName = "cart";
-          else if (route.name === "Account") iconName = "person";
+          else if (route.name === "AccountTab") iconName = "person";
 
           return (
             <View style={styles.iconWrapper}>
@@ -116,12 +114,9 @@ export default function MainTabs() {
       />
 
       <Tab.Screen
-        name="Account"
-        children={() => (
-          <RequireAuth>
-            <ProfileScreen />
-          </RequireAuth>
-        )}
+        name="AccountTab"
+        component={AccountStack}
+        options={{ title: "Account" }}
       />
     </Tab.Navigator>
   );

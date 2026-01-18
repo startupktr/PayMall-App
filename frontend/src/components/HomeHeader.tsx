@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
 import { useNavigation } from "@react-navigation/native";
 
 type HomeHeaderProps = {
@@ -78,7 +78,11 @@ export default function HomeHeader({
               />
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={handleLogout}>
+            <TouchableOpacity onPress={() =>
+              navigation.navigate("AccountTab", {
+                screen: "Profile",
+              })
+            }>
               <Image
                 source={{ uri: "https://i.pravatar.cc/150?img=12" }}
                 style={styles.avatar}
@@ -155,93 +159,93 @@ export default function HomeHeader({
 
 
 const styles = StyleSheet.create({
-    safe: {
-        backgroundColor: "#E6F4F1",
-    },
-    container: {
-        width: "100%",
-        paddingHorizontal: 16,
-        paddingTop: 10,
-        paddingBottom: 16,
-        backgroundColor: "#e0f3efff",
-    },
+  safe: {
+    backgroundColor: "#E6F4F1",
+  },
+  container: {
+    width: "100%",
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 16,
+    backgroundColor: "#e0f3efff",
+  },
 
-    /* Top Bar */
-    topRow: {
-        flexDirection: "row",
-        alignItems: "flex-start",
-        justifyContent: "space-between",
-        marginBottom: 12,
-    },
-    logo: {
-        fontSize: 22,
-        fontWeight: "800",
-        color: "#F97316",
-    },
+  /* Top Bar */
+  topRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  logo: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#F97316",
+  },
 
-    inlineLocation: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginTop: 4,
-        gap: 4,
-    },
-    inlineLocationText: {
-        fontSize: 12,
-        color: "#0F766E",
-        fontWeight: "600",
-    },
+  inlineLocation: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+    gap: 4,
+  },
+  inlineLocationText: {
+    fontSize: 12,
+    color: "#0F766E",
+    fontWeight: "600",
+  },
 
-    topIcons: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 16,
-    },
-    avatar: {
-        width: 50,
-        height: 50,
-        borderRadius: 100,
-        borderWidth: 1,
-        borderColor: "#CBD5E1",
-    },
+  topIcons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+  },
 
-    /* Location Card */
-    locationCard: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 10,
-        backgroundColor: "#FFFFFF",
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        borderRadius: 16,
-        marginBottom: 12,
-        shadowColor: "#000",
-        shadowOpacity: 0.05,
-        shadowRadius: 6,
-        elevation: 3,
-    },
-    locationTitle: {
-        fontSize: 14,
-        fontWeight: "700",
-        color: "#020617",
-    },
-    locationSub: {
-        fontSize: 12,
-        color: "#64748B",
-    },
+  /* Location Card */
+  locationCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 16,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  locationTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#020617",
+  },
+  locationSub: {
+    fontSize: 12,
+    color: "#64748B",
+  },
 
-    /* Search */
-    searchBox: {
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: "#F8FAFC",
-        borderRadius: 16,
-        paddingHorizontal: 14,
-        height: 55,
-    },
-    searchInput: {
-        flex: 1,
-        marginHorizontal: 8,
-        fontSize: 14,
-        color: "#020617",
-    },
+  /* Search */
+  searchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    height: 55,
+  },
+  searchInput: {
+    flex: 1,
+    marginHorizontal: 8,
+    fontSize: 14,
+    color: "#020617",
+  },
 });

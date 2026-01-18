@@ -1,6 +1,5 @@
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
 from payments.models import Payment
@@ -11,26 +10,16 @@ from rest_framework import generics, permissions
 import random
 from django.db import transaction
 from django.db.models import F
-from .models import Payment
 from products.models import Product
-from cart.models import Cart
 from orders.models import ExitOTP
 from .models import PaymentMethod
+from cart.models import Cart
 from .serializers import PaymentMethodSerializer
-
-from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework import status
-from django.shortcuts import get_object_or_404
-from django.db import transaction
-
-from orders.models import Order
-from payments.models import Payment
-
+from common.responses import success_response, error_response
+from products.services import check_inventory_alert
 
 class InitiatePaymentView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
 
     @transaction.atomic
     def post(self, request):
@@ -38,132 +27,289 @@ class InitiatePaymentView(APIView):
         provider = request.data.get("provider")
 
         if not order_id or not provider:
-            return Response(
-                {"error": "order_id and provider are required"},
-                status=status.HTTP_400_BAD_REQUEST
+            return error_response(
+                message="order_id and provider are required",
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         order = get_object_or_404(
             Order,
             id=order_id,
             user=request.user,
-            status="PAYMENT_PENDING"
         )
 
-        # 🔒 One order → one payment (REUSE)
-        payment, created = Payment.objects.select_for_update().get_or_create(
+        # ✅ already paid
+        if order.status == "PAID" or order.payment_status == "PAID":
+            return error_response(
+                message="Order already paid",
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # ✅ only pending orders can be paid
+        if order.status != "PAYMENT_PENDING":
+            return error_response(
+                message=f"Order is not payable (status: {order.status})",
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # ✅ If there is already a PENDING payment attempt, reuse it (avoid spam)
+        pending = (
+            Payment.objects.select_for_update()
+            .filter(order=order, status="PENDING")
+            .order_by("-created_at")
+            .first()
+        )
+
+        if pending:
+            return success_response(
+                message="Payment already initiated",
+                data={
+                    "payment_id": pending.id,
+                    "amount": str(pending.amount),
+                    "provider": pending.provider,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        # ✅ Create a new attempt (retry)
+        payment = Payment.objects.create(
             order=order,
-            defaults={
-                "provider": provider,
-                "amount": order.total,
-                "status": "PENDING",
-            }
+            provider=provider,
+            amount=order.total,
+            status="PENDING",
+            gateway_payment_id=None,
         )
 
-        # 🔁 RETRY CASE (payment already exists)
-        if not created:
-            if payment.status == "SUCCESS":
-                return Response(
-                    {"error": "Order already paid"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            # Reset for retry
-            payment.provider = provider
-            payment.status = "PENDING"
-            payment.payment_id = None
-            payment.save()
-
-        return Response(
-            {
+        return success_response(
+            message="Payment initiated",
+            data={
                 "payment_id": payment.id,
-                "amount": payment.amount,
-                "retry": not created,
+                "amount": str(payment.amount),
+                "provider": payment.provider,
             },
-            status=status.HTTP_200_OK
+            status=status.HTTP_200_OK,
         )
-
 
 class PaymentSuccessView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
 
     @transaction.atomic
     def post(self, request):
         payment_id = request.data.get("payment_id")
         gateway_payment_id = request.data.get("gateway_payment_id")
 
-        payment = get_object_or_404(Payment, id=payment_id)
+        if not payment_id or not gateway_payment_id:
+            return error_response(
+                message="payment_id and gateway_payment_id are required",
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        payment = get_object_or_404(
+            Payment.objects.select_for_update().select_related("order"),
+            id=payment_id,
+        )
+
         order = payment.order
 
+        # ✅ Ensure user owns this order/payment
+        if order.user != request.user:
+            return error_response(
+                message="Unauthorized payment access",
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # ✅ If order already paid -> safe return (prevents double stock deduction)
+        if order.status == "PAID" and order.payment_status == "PAID":
+            otp_obj = ExitOTP.objects.filter(order=order).first()
+            return success_response(
+                message="Payment already processed",
+                data={
+                    "order_id": order.id,
+                    "exit_otp": otp_obj.otp if otp_obj else None,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        # ✅ If payment already marked success, finalize order anyway
         if payment.status == "SUCCESS":
-            return Response({"message": "Already processed"})
+            order.status = "PAID"
+            order.payment_status = "PAID"
+            order.is_paid = True
+            order.payment_reference = payment.gateway_payment_id
+            order.save(update_fields=["status", "payment_status", "is_paid", "payment_reference"])
+        else:
+            # ✅ Only pending payments can be completed
+            if payment.status != "PENDING":
+                return error_response(
+                    message=f"Payment is not pending (status: {payment.status})",
+                    status=status.HTTP_409_CONFLICT,
+                )
 
-        payment.status = "SUCCESS"
-        payment.payment_id = gateway_payment_id
-        payment.save()
+            # ✅ Deduct stock safely once
+            for item in order.items.select_related("product").all():
+                product = Product.objects.select_for_update().get(id=item.product.id)
 
-        order.status = "PAID"
-        order.payment_status = "PAID"
-        order.is_paid = True
-        order.save()
+                if product.stock_quantity < item.quantity:
+                    payment.status = "FAILED"
+                    payment.save(update_fields=["status"])
 
-        # 🔥 Deduct stock
-        for item in order.items.select_related("product"):
-            product = Product.objects.select_for_update().get(id=item.product.id)
+                    return error_response(
+                        message=f"Stock not available for {product.name}",
+                        status=status.HTTP_409_CONFLICT,
+                    )
 
-            if product.stock_quantity < item.quantity:
-                raise Exception("Stock inconsistency")
+                product.stock_quantity = F("stock_quantity") - item.quantity
+                product.save(update_fields=["stock_quantity"])
 
-            product.stock_quantity = F("stock_quantity") - item.quantity
-            product.save()
+            # ✅ Mark payment success
+            payment.status = "SUCCESS"
+            payment.gateway_payment_id = gateway_payment_id
+            payment.save(update_fields=["status", "gateway_payment_id"])
 
-        ExitOTP.objects.get_or_create(
+            # ✅ Mark order success
+            order.status = "PAID"
+            order.payment_status = "PAID"
+            order.is_paid = True
+            order.payment_reference = gateway_payment_id
+            order.save(update_fields=["status", "payment_status", "is_paid", "payment_reference"])
+
+        # ✅ Clear ACTIVE cart after payment success (POS correct)
+        cart = Cart.objects.filter(
+            user=order.user,
+            mall=order.mall,
+            status="ACTIVE",
+        ).prefetch_related("items").first()
+
+        if cart:
+            cart.items.all().delete()
+
+        # ✅ Create exit OTP
+        otp_obj, _ = ExitOTP.objects.get_or_create(
             order=order,
             defaults={
                 "otp": str(random.randint(100000, 999999)),
-                "expires_at": timezone.now() + timedelta(minutes=5)
-            }
+                "expires_at": timezone.now() + timedelta(minutes=5),
+            },
         )
 
-        Cart.objects.filter(user=order.user).delete()
+        return success_response(
+            message="Payment successful",
+            data={
+                "order_id": order.id,
+                "exit_otp": otp_obj.otp,
+            },
+            status=status.HTTP_200_OK,
+        )
 
-        return Response({"message": "Payment successful"})
+class PaymentFailedView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request):
+        payment_id = request.data.get("payment_id")
+
+        if not payment_id:
+            return error_response(message="payment_id is required", status=400)
+
+        payment = get_object_or_404(
+            Payment.objects.select_for_update().select_related("order"),
+            id=payment_id,
+        )
+
+        if payment.order.user != request.user:
+            return error_response(message="Unauthorized", status=403)
+
+        if payment.status == "SUCCESS":
+            return error_response(message="Payment already success", status=400)
+
+        payment.status = "FAILED"
+        payment.save(update_fields=["status"])
+
+        return success_response(
+            message="Payment marked as failed",
+            data={"payment_id": payment.id},
+            status=200,
+        )
+
 
 class PaymentMethodListView(generics.ListCreateAPIView):
-    """
-    LIST & CREATE payment methods
-    """
-    serializer_class = PaymentMethodSerializer
     permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PaymentMethodSerializer
 
     def get_queryset(self):
         return PaymentMethod.objects.filter(user=self.request.user)
 
-    def perform_create(self, serializer):
-        if serializer.validated_data.get("is_default", False):
+    def list(self, request, *args, **kwargs):
+        serializer = self.get_serializer(self.get_queryset(), many=True)
+        return success_response(
+            message="Payment methods fetched",
+            data=serializer.data,
+            status=status.HTTP_200_OK,
+        )
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+
+        if not serializer.is_valid():
+            return error_response(
+                message="Validation failed",
+                errors=serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if serializer.validated_data.get("is_default"):
             PaymentMethod.objects.filter(
-                user=self.request.user,
-                payment_type=serializer.validated_data.get("payment_type")
+                user=request.user,
+                payment_type=serializer.validated_data["payment_type"],
             ).update(is_default=False)
 
-        serializer.save(user=self.request.user)
+        serializer.save(user=request.user)
+
+        return success_response(
+            message="Payment method added",
+            data=serializer.data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class PaymentMethodDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """
-    RETRIEVE / UPDATE / DELETE payment method
-    """
-    serializer_class = PaymentMethodSerializer
     permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PaymentMethodSerializer
 
     def get_queryset(self):
         return PaymentMethod.objects.filter(user=self.request.user)
 
-    def perform_update(self, serializer):
-        if serializer.validated_data.get("is_default", False):
+    def update(self, request, *args, **kwargs):
+        serializer = self.get_serializer(
+            self.get_object(), data=request.data, partial=True
+        )
+
+        if not serializer.is_valid():
+            return error_response(
+                message="Validation failed",
+                errors=serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if serializer.validated_data.get("is_default"):
             PaymentMethod.objects.filter(
-                user=self.request.user,
-                payment_type=serializer.validated_data.get("payment_type")
+                user=request.user,
+                payment_type=serializer.validated_data["payment_type"],
             ).exclude(id=self.get_object().id).update(is_default=False)
 
         serializer.save()
+
+        return success_response(
+            message="Payment method updated",
+            data=serializer.data,
+            status=status.HTTP_200_OK,
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        self.get_object().delete()
+
+        return success_response(
+            message="Payment method deleted",
+            status=status.HTTP_200_OK,
+        )
+

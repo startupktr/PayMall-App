@@ -1,66 +1,79 @@
-from products.models import Product
-from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
-from .serializers import ProductSerializer, ProductDetailSerializer
-from rest_framework.generics import ListAPIView, RetrieveAPIView
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from malls.models import Mall
-
-from rest_framework.generics import ListAPIView
-from rest_framework.exceptions import ValidationError
 from django.db.models import Q, Count
+from rest_framework import status
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.views import APIView
+from rest_framework.exceptions import ValidationError
+
+from common.responses import success_response, error_response
 from .models import Product, Category
-from .serializers import ProductSerializer, CategorySerializer
+from .serializers import (
+    ProductSerializer,
+    ProductDetailSerializer,
+    CategorySerializer,
+)
 
-class MallCategoryListView(ListAPIView):
-    serializer_class = CategorySerializer
 
-    def get_queryset(self):
-        mall_id = self.request.query_params.get("mall")
+class MallCategoryListView(APIView):
+    permission_classes = [AllowAny]
 
+    def get(self, request):
+        mall_id = request.query_params.get("mall")
         if not mall_id:
-            raise ValidationError({"mall": "mall_id is required"})
+            return error_response(
+                message="mall query param is required",
+                errors={"mall": ["mall_id is required"]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        return (
-            Category.objects
-            .filter(
+        qs = (
+            Category.objects.filter(
                 products__mall_id=mall_id,
                 products__is_available=True,
-                products__stock_quantity__gt=0
+                products__stock_quantity__gt=0,
+                products__status="ACTIVE",
             )
             .annotate(product_count=Count("products"))
             .distinct()
             .order_by("name")
         )
 
-class ProductListView(ListAPIView):
+        return success_response(
+            message="Mall categories fetched successfully",
+            data=CategorySerializer(qs, many=True).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class ProductListView(APIView):
     """
     List products for a given mall with optional:
     - category
     - search
     - sorting
     """
-    serializer_class = ProductSerializer
+    permission_classes = [AllowAny]
 
-    def get_queryset(self):
-        params = self.request.query_params
+    def get(self, request):
+        params = request.query_params
 
         mall_id = params.get("mall")
         if not mall_id:
-            raise ValidationError({"mall": "mall_id is required"})
+            return error_response(
+                message="mall query param is required",
+                errors={"mall": ["mall_id is required"]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         queryset = Product.objects.filter(
+            status="ACTIVE",
             is_available=True,
-            mall_id=mall_id
+            mall_id=mall_id,
         )
 
         # 🔹 Category filter
         category = params.get("category")
         if category and category.lower() != "all":
-            queryset = queryset.filter(
-                category__name__iexact=category
-            )
+            queryset = queryset.filter(category__name__iexact=category)
 
         # 🔹 Search (name OR description)
         search = params.get("search")
@@ -72,57 +85,70 @@ class ProductListView(ListAPIView):
 
         # 🔹 Sorting
         sort = params.get("sort")
-
         if sort == "price_asc":
             queryset = queryset.order_by("price")
-
         elif sort == "price_desc":
             queryset = queryset.order_by("-price")
-
         elif sort == "Popular":
-            queryset = queryset.order_by("-created_at")  # or popularity field
+            queryset = queryset.order_by("-created_at")  # replace with real field if available
 
-        return queryset
+        serialized = ProductSerializer(queryset, many=True).data
 
-    
-class ProductDetailView(RetrieveAPIView):
-    """View to retrieve a specific product"""
-    queryset = Product.objects.all()
-    serializer_class = ProductDetailSerializer
+        return success_response(
+            message="Products fetched successfully",
+            data=serialized,
+            status=status.HTTP_200_OK,
+        )
+
+
+class ProductDetailView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, pk):
+        product = Product.objects.filter(pk=pk).first()
+
+        if not product:
+            return error_response(
+                message="Product not found",
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return success_response(
+            message="Product details fetched successfully",
+            data=ProductDetailSerializer(product).data,
+            status=status.HTTP_200_OK,
+        )
+
 
 class ProductBarcodeView(APIView):
-    """View to retrieve a product by barcode"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request):
         barcode = request.data.get("barcode")
         mall_id = request.data.get("mall_id")
 
         if not barcode or not mall_id:
-            return Response(
-                {"error": "Barcode and mall_id required"},
-                status=status.HTTP_400_BAD_REQUEST
+            return error_response(
+                message="barcode and mall_id are required",
+                errors={"barcode": ["required"], "mall_id": ["required"]},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        try:
-            mall = Mall.objects.get(id=mall_id, is_active=True)
-        except Mall.DoesNotExist:
-            return Response(
-                {"error": "Invalid mall"},
-                status=status.HTTP_404_NOT_FOUND
+        product = Product.objects.filter(
+            status="ACTIVE",
+            barcode=barcode,
+            mall_id=mall_id,
+            is_available=True,
+        ).first()
+
+        if not product:
+            return error_response(
+                message="Product not found or unavailable",
+                status=status.HTTP_404_NOT_FOUND,
             )
 
-        try:
-            product = Product.objects.get(
-                barcode=barcode,
-                mall=mall,
-                is_available=True
-            )
-            serializer = ProductDetailSerializer(product)
-            return Response(serializer.data)
-        except Product.DoesNotExist:
-            return Response(
-                {"error": "Product with this barcode not found or not available"}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
-
+        return success_response(
+            message="Product found",
+            data=ProductDetailSerializer(product).data,
+            status=status.HTTP_200_OK,
+        )

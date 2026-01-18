@@ -7,136 +7,131 @@ import {
   LayoutAnimation,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useCart } from "@/context/CartContext";
+
 
 type Props = {
-  subtotal: number;
+  subtotal: number; // taxable (or fallback)
+  gst: number;      // total gst included (or fallback)
+  cgst?: number;
+  sgst?: number;
   discount: number;
-  gst: number;
   delivery: number;
-  total: number;
+  total: number;    // payable inclusive
   onCheckout: () => void;
 };
 
 export default function PriceDetailsCard({
   subtotal,
-  discount,
   gst,
+  cgst = 0,
+  sgst = 0,
+  discount,
   delivery,
   total,
   onCheckout,
 }: Props) {
   const [open, setOpen] = useState(false);
 
+  const { isGuest } = useCart();
+
   const toggle = () => {
-    LayoutAnimation.configureNext(
-      LayoutAnimation.Presets.easeInEaseOut
-    );
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setOpen((p) => !p);
   };
 
   return (
-    <View style={styles.card}>
-      {/* HEADER */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Price Details</Text>
+    <View style={styles.wrap}>
+      <View style={styles.card}>
+        {/* HEADER */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Price Details</Text>
 
-        <TouchableOpacity
-          style={styles.breakupBtn}
-          onPress={toggle}
-        >
-          <Text style={styles.breakupText}>
-            {open ? "Hide Breakup" : "Show Breakup"}
-          </Text>
-          <Ionicons
-            name={open ? "chevron-up" : "chevron-down"}
-            size={16}
-            color="#2563EB"
-          />
+          { !isGuest && (
+          <TouchableOpacity style={styles.breakupBtn} onPress={toggle}>
+            <Text style={styles.breakupText}>
+              {open ? "Hide breakup" : "Show breakup"}
+            </Text>
+            <Ionicons
+              name={open ? "chevron-up" : "chevron-down"}
+              size={16}
+              color="#4F46E5"
+            />
+          </TouchableOpacity>
+          )}
+
+        </View>
+
+        {/* POS total (primary) */}
+        <Row
+          label="Total Payable (Incl. GST)"
+          value={`₹${Number(total).toFixed(2)}`}
+          bold
+        />
+
+        {/* BREAKUP */}
+        {open && (
+          <View style={styles.breakupBox}>
+            <Row label="Taxable Amount" value={`₹${Number(subtotal).toFixed(2)}`} />
+            <Row label="GST Included" value={`₹${Number(gst).toFixed(2)}`} />
+            <Row label="CGST" value={`₹${Number(cgst).toFixed(2)}`} />
+            <Row label="SGST" value={`₹${Number(sgst).toFixed(2)}`} />
+
+            {discount > 0 && (
+              <Row
+                label="Discount"
+                value={`-₹${Number(discount).toFixed(2)}`}
+                green
+              />
+            )}
+
+            {delivery > 0 && (
+              <Row
+                label="Delivery"
+                value={`₹${Number(delivery).toFixed(2)}`}
+              />
+            )}
+
+            <Text style={styles.note}>
+              Prices are GST inclusive
+            </Text>
+          </View>
+        )}
+
+        <TouchableOpacity style={styles.checkoutBtn} onPress={onCheckout}>
+          <Text style={styles.checkoutText}>Proceed to Checkout</Text>
         </TouchableOpacity>
       </View>
-
-      {/* SUBTOTAL */}
-      <Row label="Subtotal" value={`₹${subtotal.toFixed(2)}`} />
-
-      {/* BREAKUP */}
-      {open && (
-        <>
-          <Row
-            label="Discount"
-            value={`-₹${discount.toFixed(2)}`}
-            green
-          />
-          <Row
-            label="GST"
-            value={`₹${gst.toFixed(2)}`}
-          />
-          <Row
-            label="Delivery"
-            value={
-              delivery === 0 ? "Free" : `₹${delivery.toFixed(2)}`
-            }
-          />
-        </>
-      )}
-
-      <View style={styles.divider} />
-
-      {/* TOTAL */}
-      <Row
-        label="Total Amount"
-        value={`₹${total.toFixed(2)}`}
-        bold
-      />
-
-      {/* CTA */}
-      <TouchableOpacity
-        style={styles.checkoutBtn}
-        onPress={onCheckout}
-      >
-        <Text style={styles.checkoutText}>
-          Proceed to Checkout
-        </Text>
-      </TouchableOpacity>
     </View>
   );
 }
 
-/* ---------------- ROW ---------------- */
 const Row = ({ label, value, bold, green }: any) => (
   <View style={styles.row}>
-    <Text
-      style={[
-        styles.label,
-        bold && styles.bold,
-      ]}
-    >
-      {label}
-    </Text>
-
-    <Text
-      style={[
-        styles.value,
-        bold && styles.bold,
-        green && styles.green,
-      ]}
-    >
+    <Text style={[styles.label, bold && styles.bold]}>{label}</Text>
+    <Text style={[styles.value, bold && styles.bold, green && styles.green]}>
       {value}
     </Text>
   </View>
 );
 
-/* ---------------- STYLES ---------------- */
 const styles = StyleSheet.create({
+  // ✅ fixed bottom sheet style
+  wrap: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 16,
+  },
   card: {
     backgroundColor: "#fff",
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 16,
-    margin: 16,
     shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 4,
-    bottom:-50
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 6,
   },
 
   header: {
@@ -148,22 +143,37 @@ const styles = StyleSheet.create({
 
   title: {
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: "900",
+    color: "#0F172A",
   },
 
   breakupBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    borderWidth: 1,
-    borderColor: "#2563EB",
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    gap: 6,
+    backgroundColor: "#EEF2FF",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
 
   breakupText: {
-    color: "#2563EB",
+    color: "#4F46E5",
+    fontWeight: "900",
+  },
+
+  breakupBox: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 10,
+    marginBottom: 10,
+  },
+
+  note: {
+    marginTop: 8,
+    fontSize: 12,
+    color: "#64748B",
     fontWeight: "600",
   },
 
@@ -174,38 +184,35 @@ const styles = StyleSheet.create({
   },
 
   label: {
-    color: "#334155",
+    color: "#475569",
+    fontWeight: "700",
   },
 
   value: {
-    fontWeight: "600",
+    fontWeight: "900",
+    color: "#0F172A",
   },
 
   bold: {
-    fontWeight: "700",
+    fontWeight: "900",
+    color: "#0F172A",
   },
 
   green: {
     color: "#16A34A",
   },
 
-  divider: {
-    height: 1,
-    backgroundColor: "#E2E8F0",
-    marginVertical: 8,
-  },
-
   checkoutBtn: {
-    marginTop: 12,
+    marginTop: 10,
     backgroundColor: "#4F46E5",
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: "center",
   },
 
   checkoutText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: "900",
   },
 });

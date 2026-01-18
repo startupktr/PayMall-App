@@ -8,9 +8,8 @@ class OrderItemInline(admin.TabularInline):
     readonly_fields = ('product_name', 'product_price', 'product_barcode', 'total_price')
 
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ('order_number', 'user', 'mall', 'status', 'payment_status', 
-                    'payment_method', 'total', 'created_at')
-    list_filter = ('status', 'payment_status', 'payment_method', 'mall')
+    list_display = ('order_number', 'user', 'mall', 'status', 'payment_status', 'total', 'created_at')
+    list_filter = ('status', 'payment_status', 'mall')
     search_fields = ('order_number', 'user__email', 'user__username')
     readonly_fields = ('subtotal', 'tax', 'total')
     inlines = [OrderItemInline]

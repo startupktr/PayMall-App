@@ -36,3 +36,4 @@ class ProductDetailSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'barcode', 'description', 'price', 'marked_price', 
                  'discount_percentage', 'image', 'category', 'mall', 
                  'stock_quantity', 'is_available', 'created_at', 'updated_at')
+        

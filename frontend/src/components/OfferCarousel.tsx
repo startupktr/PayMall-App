@@ -6,7 +6,7 @@ import {
   Dimensions,
 } from "react-native";
 import OfferBanner from "./OfferBanner";
-import { Offer } from "../types/offer";
+import { Offer } from "@/types/offer";
 
 const { width } = Dimensions.get("window");
 

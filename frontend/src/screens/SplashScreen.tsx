@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { View, Text, StyleSheet, Image, Animated } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
 
 type Props = NativeStackScreenProps<any>;
 
@@ -38,7 +38,7 @@ export default function SplashScreen({ navigation }: Props) {
     if (!loading) {
       const timer = setTimeout(() => {
         navigation.replace(user ? "Main" : "Auth");
-      }, 1500);
+      }, 2500);
 
       return () => clearTimeout(timer);
     }
@@ -47,7 +47,7 @@ export default function SplashScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <Animated.Image
-        source={require("../../assets/Splash-Icon.png")}
+        source={require("@/../assets/Splash-Icon.png")}
         style={[
           styles.logo,
           {

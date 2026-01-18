@@ -1,7 +1,7 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import OrdersScreen from "../screens/OrdersScreen";
-import RequireAuth from "../components/RequireAuth";
-import OrderDetailsScreen from "../screens/OrderDetailsScreen";
+import OrdersScreen from "@/screens/orders/OrdersScreen";
+import RequireAuth from "@/components/RequireAuth";
+import OrderDetailsScreen from "@/screens/orders/OrderDetailsScreen";
 
 const Stack = createNativeStackNavigator();
 
