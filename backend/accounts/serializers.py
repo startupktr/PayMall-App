@@ -7,6 +7,8 @@ User = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
     roles = serializers.SerializerMethodField()
+    full_name = serializers.CharField(source="profile.full_name", read_only=True)
+    avatar = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -17,11 +19,20 @@ class UserSerializer(serializers.ModelSerializer):
             "signup_source",
             "is_active",
             "roles",
+            "full_name",
+            "avatar",
         )
         read_only_fields = ("id", "email", "signup_source", "is_active")
 
     def get_roles(self, obj):
         return list(obj.roles.values_list("role", flat=True))
+    
+    def get_avatar(self, obj):
+        if obj.profile.avatar:
+            request = self.context.get("request")
+            url = obj.profile.avatar.url
+            return request.build_absolute_uri(url) if request else url
+        return None
 
 class CustomerSignupSerializer(serializers.ModelSerializer):
     password2 = serializers.CharField(write_only=True)

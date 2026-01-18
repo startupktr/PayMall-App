@@ -11,7 +11,7 @@
       "tsconfigPaths": true
     },
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/Splash-Icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -26,7 +26,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "softwareKeyboardLayoutMode": "resize"
+      "softwareKeyboardLayoutMode": "resize",
+      "package": "com.startupktr.frontend"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -35,6 +36,11 @@
       "expo-secure-store",
       "@react-native-community/datetimepicker",
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b852c793-4f3d-4bf6-a977-c77a9a31a648"
+      }
+    }
   }
 }

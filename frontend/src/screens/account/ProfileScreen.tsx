@@ -11,11 +11,13 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { useAuth } from "../../context/AuthContext";
 
 const ProfileScreen = () => {
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
+  const { user } = useAuth();
+  const [name, setName] = useState(user.full_name || "");
+  const [phone, setPhone] = useState(user.phone_number || "");
+  const [email, setEmail] = useState(user.email || "");
   const [gender, setGender] = useState("");
   const [dob, setDob] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);

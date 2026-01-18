@@ -159,22 +159,6 @@ export default function MallDetailsScreen({ route, navigation }: any) {
     return cart?.items?.find((x) => x.product.id === productId)?.quantity || 0;
   };
 
-  const handleAdd = async (p: Product) => {
-    try {
-      await addToCart(
-        {
-          id: p.id,
-          name: p.name,
-          price: String(p.price),
-          image: p.image ?? null,
-        },
-        1
-      );
-    } catch (e) {
-      Alert.alert("Error", "Unable to add product to cart");
-    }
-  };
-
   /* ================= HEADER ================= */
 
   const renderHeader = () => (
@@ -183,15 +167,6 @@ export default function MallDetailsScreen({ route, navigation }: any) {
         <Text style={styles.mallTitle}>Welcome to {mall?.name ?? ""}</Text>
         <Text style={styles.mallSub}>{mall?.description}</Text>
         <Text style={styles.mallSub}>{mall?.address}</Text>
-
-        {/* {isGuest && (
-          <View style={styles.guestBanner}>
-            <Ionicons name="person-outline" size={16} color="#0F766E" />
-            <Text style={styles.guestText}>
-              Guest mode: Cart saved only on this device
-            </Text>
-          </View>
-        )} */}
       </View>
 
       {offers.length > 0 && <OfferCarousel offers={offers} onPress={() => {}} />}

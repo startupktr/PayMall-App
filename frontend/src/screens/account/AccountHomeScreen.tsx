@@ -17,12 +17,12 @@ import { useAuth } from "../../context/AuthContext";
 
 export default function AccountHomeScreen() {
     const navigation: any = useNavigation();
-    const { logout } = useAuth();
-    const user = {
-        name: "Chandan Roy",
-        phoneMasked: "+91 ••••• 3210",
+    const { user, logout } = useAuth();
+    const User = {
+        name: user.full_name,
+        phoneMasked: `+91 ••••• ${user.phone_number.slice(-4)}`,
         unreadNotifications: 3,
-        profileImage: "https://i.pravatar.cc/150?img=12",
+        profileImage: user.avatar,
     };
 
     const Onlogout = () => {
@@ -52,7 +52,15 @@ export default function AccountHomeScreen() {
                             onPress={() => navigation.navigate("Profile")}
                             activeOpacity={0.85}
                         >
-                            <Image source={{ uri: user.profileImage }} style={styles.avatar} />
+                            {user?.avatar ? (
+                                <Image source={{ uri: User.profileImage }} style={styles.avatar} />
+                            ) : (
+                                <View style={styles.avatarFallback}>
+                                    <Text style={styles.avatarText}>
+                                        {user?.full_name?.[0]?.toUpperCase() ?? "U"}
+                                    </Text>
+                                </View>
+                            )}
                         </TouchableOpacity>
 
                         {/* User Info */}
@@ -60,19 +68,19 @@ export default function AccountHomeScreen() {
                             <Text style={styles.welcome}>Account</Text>
 
                             <View style={styles.nameRow}>
-                                <Text style={styles.name}>{user.name}</Text>
+                                <Text style={styles.name}>{User.name}</Text>
                             </View>
 
-                            <Text style={styles.sub}>{user.phoneMasked}</Text>
+                            <Text style={styles.sub}>{User.phoneMasked}</Text>
                         </View>
 
                         {/* Notification Button */}
                         <TouchableOpacity style={styles.notifBtn} activeOpacity={0.85}>
                             <Ionicons name="notifications-outline" size={22} color="#2FA4A9" />
-                            {user.unreadNotifications > 0 && (
+                            {User.unreadNotifications > 0 && (
                                 <View style={styles.badge}>
                                     <Text style={styles.badgeText}>
-                                        {user.unreadNotifications > 9 ? "9+" : user.unreadNotifications}
+                                        {User.unreadNotifications > 9 ? "9+" : User.unreadNotifications}
                                     </Text>
                                 </View>
                             )}
@@ -230,6 +238,22 @@ const styles = StyleSheet.create({
     avatar: {
         width: "100%",
         height: "100%",
+    },
+
+    avatarFallback: {
+        width: "100%",       // ✅ full size
+        height: "100%",      // ✅ full size
+        borderRadius: 28,    // ✅ same as wrap
+        backgroundColor: "#E2E8F0",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+
+    avatarText: {
+        fontSize: 28,        // ✅ bigger so it looks like avatar-sized
+        fontWeight: "900",
+        color: "#334155",
+        lineHeight: 32,      // ✅ better vertical alignment on Android
     },
 
     welcome: {

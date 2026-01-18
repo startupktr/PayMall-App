@@ -42,6 +42,7 @@ export default function HomeScreen({ navigation }: any) {
   const [showAllMalls, setShowAllMalls] = useState(false);
   const [search, setSearch] = useState("");
   const { setSelectedMall } = useMall();
+  const [formatted, setFormatted] = useState(null);
 
   /* ================= INITIAL LOAD ================= */
   useFocusEffect(
@@ -77,7 +78,7 @@ export default function HomeScreen({ navigation }: any) {
           return;
         }
       }
-      
+
       await fetchLocationAndMalls();
     } catch (err) {
       console.log("Location init error:", err);
@@ -92,6 +93,24 @@ export default function HomeScreen({ navigation }: any) {
       });
 
       const { latitude, longitude } = location.coords;
+
+      const res = await Location.reverseGeocodeAsync({ latitude, longitude });
+      const place = res?.[0] ?? null;
+
+      // ✅ Google Maps style formatting
+      const city =
+        place?.city ||
+        (place as any)?.subregion || // sometimes expo gives subregion
+        place?.district ||
+        place?.region ||
+        "";
+
+      const state = place?.region || "";
+      const country = place?.country || "";
+
+      // Prefer: "City, State" (and optional Country)
+      setFormatted([city, state, country].filter(Boolean).join(", "));
+
       await fetchNearbyMalls(latitude, longitude);
     } catch (err) {
       console.log("Location fetch error:", err);
@@ -183,6 +202,7 @@ export default function HomeScreen({ navigation }: any) {
         showLocationTextBelowLogo
         searchValue={search}
         onSearchChange={setSearch}
+        locationTitle={formatted}
         searchPlaceholder="Search nearby malls..."
       />
 

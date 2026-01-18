@@ -297,6 +297,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
+    marginTop: 16
   },
   buttonDisabled: {
     backgroundColor: '#93C5FD',

@@ -178,10 +178,12 @@ export default function ScannerScreen() {
         qty
       );
 
-      Alert.alert("Added to Cart", "Product added successfully", [
-        { text: "Scan Again", onPress: restartScanner },
-        { text: "Go to Cart", onPress: () => navigation.navigate("CartTab") },
-      ]);
+      restartScanner();
+
+      // Alert.alert("Added to Cart", "Product added successfully", [
+      //   { text: "Scan Again", onPress: restartScanner },
+      //   { text: "Go to Cart", onPress: () => navigation.navigate("CartTab") },
+      // ]);
     } catch {
       Alert.alert("Error", "Unable to add product to cart");
       restartScanner();
@@ -321,7 +323,7 @@ export default function ScannerScreen() {
             </Text>
 
             <Text style={styles.productPrice}>
-              ₹{previewProduct?.price}
+              ₹{Number(previewProduct?.price * qty).toFixed(2)}
             </Text>
 
             {/* QTY */}

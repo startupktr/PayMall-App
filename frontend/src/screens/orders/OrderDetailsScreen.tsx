@@ -289,12 +289,12 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 999,
+    borderRadius: 8,
     marginTop: 10,
   },
 
   card: {
-    borderRadius: 18,
+    borderRadius: 10,
     padding: 16,
     marginTop: 18,
     borderWidth: 1,

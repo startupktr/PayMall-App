@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
     margin: 16,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 14,
+    borderRadius: 10,
     borderWidth: 1,
   },
   searchInput: {
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
     flex: 1,
     justifyContent: "space-between",
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 12,
     padding: 16,
-    borderRadius: 14,
+    borderRadius: 10,
     borderWidth: 1,
     shadowColor: "#000",
     shadowOpacity: 0.05,
@@ -425,9 +425,9 @@ const styles = StyleSheet.create({
 
   badge: {
     marginTop: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 999,
+    borderRadius: 7,
   },
 
   empty: {

@@ -9,7 +9,6 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAuth } from "@/context/AuthContext";
 import { useNavigation } from "@react-navigation/native";
 
 type HomeHeaderProps = {
@@ -21,13 +20,13 @@ type HomeHeaderProps = {
   onSearchChange?: (text: string) => void;
   onSearchSubmit?: () => void;
   searchPlaceholder?: string;
-  showSearch?: boolean; // 👈 NEW (optional)
+  showSearch?: boolean;
 };
 
 export default function HomeHeader({
   showLocationBar = true,
   showLocationTextBelowLogo = false,
-  locationTitle = "Bangalore",
+  locationTitle = "",
 
   searchValue = "",
   onSearchChange,
@@ -35,17 +34,7 @@ export default function HomeHeader({
   searchPlaceholder = "Search",
   showSearch = true,
 }: HomeHeaderProps) {
-  const { logout } = useAuth();
   const navigation = useNavigation<any>();
-
-  const handleLogout = async () => {
-    await logout();
-
-    navigation.reset({
-      index: 0,
-      routes: [{ name: "Auth" }],
-    });
-  };
 
   return (
     <SafeAreaView edges={["top"]} style={styles.safe}>
