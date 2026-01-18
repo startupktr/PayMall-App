@@ -6,52 +6,68 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  useColorScheme,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import api from "@/api/axios";
 import { Ionicons } from "@expo/vector-icons";
 
-type PaymentMethod = "CARD" | "UPI" | "CASH";
+type PaymentMethod = "UPI" | "CARD" | "CASH";
 
 export default function PaymentScreen({ route, navigation }: any) {
-  const { orderId, amount } = route.params;
+  const { orderId } = route.params;
 
-  const [method, setMethod] = useState<PaymentMethod | null>("UPI");
+  const scheme = useColorScheme();
+  const isDark = scheme === "dark";
+
+  const [method, setMethod] = useState<PaymentMethod>("UPI");
   const [loading, setLoading] = useState(false);
 
-  const payLabel = useMemo(() => {
-    const a = Number(amount || 0).toFixed(2);
-    return `Pay ₹${a}`;
-  }, [amount]);
+  const theme = useMemo(() => {
+    return {
+      bg: isDark ? "#020617" : "#F8FAFC",
+      headerBg: isDark ? "#0B1220" : "#FFFFFF",
+      cardBg: isDark ? "#0F172A" : "#FFFFFF",
+      border: isDark ? "#1E293B" : "#E2E8F0",
+      text: isDark ? "#F8FAFC" : "#0F172A",
+      subText: isDark ? "#94A3B8" : "#64748B",
+      rowBg: isDark ? "#0B1220" : "#FFFFFF",
+      selectedBg: isDark ? "#052E2B" : "#ECFDF5",
+      selectedBorder: "#22C55E",
+      btnBg: "#0F766E",
+      btnText: "#FFFFFF",
+    };
+  }, [isDark]);
+
+  const provider = useMemo(() => {
+    // ✅ backend accepted values can be "UPI" | "CARD" | "CASH"
+    if (method === "UPI") return "UPI";
+    if (method === "CARD") return "CARD";
+    return "CASH";
+  }, [method]);
 
   const payNow = async () => {
-    if (!method) {
-      Alert.alert("Select payment method", "Please choose a method to continue.");
-      return;
-    }
-
     try {
       setLoading(true);
 
-      const res: any = await api.post("payments/initiate/", {
+      // ✅ Create payment attempt ONLY after user chooses method
+      const res: any = await api.post("payments/create-attempt/", {
         order_id: orderId,
-        provider: method === "UPI" ? "UPI" : method === "CARD" ? "CARD" : "CASH",
+        provider, // ✅ uses selected payment method
       });
 
-      /**
-       * ✅ Backend response format:
-       * { success, message, data: { payment_id, amount, provider } }
-       */
-      const paymentId = res?.data?.payment_id;
+      const success = res?.success ?? true;
+      const data = res?.data ?? res;
 
-      if (!paymentId) {
-        throw new Error("Payment initiation failed");
+      if (!success || !data?.attempt_id) {
+        Alert.alert("Error", res?.message || "Payment init failed");
+        return;
       }
 
+      // ✅ after attempt created, move to processing screen
       navigation.replace("PaymentProcessing", {
-        paymentId,
+        attemptId: data.attempt_id,
         orderId,
-        amount: res?.data?.amount ?? amount,
       });
     } catch (err: any) {
       Alert.alert(
@@ -63,21 +79,28 @@ export default function PaymentScreen({ route, navigation }: any) {
     }
   };
 
+  const payLabel = useMemo(() => {
+    if (method === "UPI") return "Pay with UPI";
+    if (method === "CARD") return "Pay with Card";
+    return "Confirm Cash Payment";
+  }, [method]);
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
       {/* HEADER */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={22} color="#0F172A" />
+      <View style={[styles.header, { backgroundColor: theme.headerBg, borderColor: theme.border }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 4 }}>
+          <Ionicons name="arrow-back" size={22} color={theme.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Choose Payment</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Choose Payment</Text>
       </View>
 
-      {/* PAYMENT METHODS */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Payment Method</Text>
+      {/* CARD */}
+      <View style={[styles.card, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+        <Text style={[styles.cardTitle, { color: theme.text }]}>Payment Method</Text>
 
         <PaymentOption
+          theme={theme}
           icon="wallet-outline"
           title="UPI"
           subtitle="Pay using any UPI app"
@@ -86,6 +109,7 @@ export default function PaymentScreen({ route, navigation }: any) {
         />
 
         <PaymentOption
+          theme={theme}
           icon="card-outline"
           title="Card"
           subtitle="Credit / Debit Card"
@@ -94,28 +118,26 @@ export default function PaymentScreen({ route, navigation }: any) {
         />
 
         <PaymentOption
+          theme={theme}
           icon="cash-outline"
           title="Cash"
           subtitle="Pay at counter"
           selected={method === "CASH"}
           onPress={() => setMethod("CASH")}
         />
-
-        <View style={styles.amountRow}>
-          <Text style={styles.amountLabel}>Payable Amount</Text>
-          <Text style={styles.amountValue}>₹{Number(amount).toFixed(2)}</Text>
-        </View>
       </View>
 
+      {/* PAY */}
       <TouchableOpacity
-        style={[styles.payBtn, loading && { opacity: 0.7 }]}
+        style={[styles.payBtn, { backgroundColor: theme.btnBg }, loading && { opacity: 0.7 }]}
         onPress={payNow}
         disabled={loading}
+        activeOpacity={0.9}
       >
         {loading ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text style={styles.payText}>{payLabel}</Text>
+          <Text style={[styles.payText, { color: theme.btnText }]}>{payLabel}</Text>
         )}
       </TouchableOpacity>
     </SafeAreaView>
@@ -128,61 +150,58 @@ function PaymentOption({
   subtitle,
   selected,
   onPress,
+  theme,
 }: any) {
   return (
     <TouchableOpacity
-      style={[styles.paymentRow, selected && styles.paymentSelected]}
+      style={[
+        styles.paymentRow,
+        {
+          backgroundColor: selected ? theme.selectedBg : theme.rowBg,
+          borderColor: selected ? theme.selectedBorder : theme.border,
+        },
+      ]}
       onPress={onPress}
       activeOpacity={0.9}
     >
-      <View style={[styles.iconCircle, selected && { backgroundColor: "#E0F2FE" }]}>
-        <Ionicons name={icon} size={20} color={selected ? "#0284C7" : "#334155"} />
+      <View
+        style={[
+          styles.iconCircle,
+          { backgroundColor: selected ? "#E0F2FE" : theme.border },
+        ]}
+      >
+        <Ionicons name={icon} size={20} color={selected ? "#0284C7" : theme.subText} />
       </View>
 
       <View style={{ flex: 1 }}>
-        <Text style={styles.paymentTitle}>{title}</Text>
-        <Text style={styles.paymentSub}>{subtitle}</Text>
+        <Text style={[styles.paymentTitle, { color: theme.text }]}>{title}</Text>
+        <Text style={[styles.paymentSub, { color: theme.subText }]}>{subtitle}</Text>
       </View>
 
-      {selected && (
-        <Ionicons name="checkmark-circle" size={22} color="#16A34A" />
-      )}
+      {selected && <Ionicons name="checkmark-circle" size={22} color="#16A34A" />}
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8FAFC" },
+  container: { flex: 1 },
 
   header: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     padding: 16,
-    backgroundColor: "#fff",
     borderBottomWidth: 1,
-    borderColor: "#E2E8F0",
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "900",
-    color: "#0F172A",
-  },
+  headerTitle: { fontSize: 18, fontWeight: "900" },
 
   card: {
-    backgroundColor: "#fff",
     margin: 16,
     padding: 16,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
   },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: "900",
-    marginBottom: 14,
-    color: "#0F172A",
-  },
+  cardTitle: { fontSize: 16, fontWeight: "900", marginBottom: 14 },
 
   paymentRow: {
     flexDirection: "row",
@@ -190,53 +209,26 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
     borderRadius: 16,
     marginBottom: 12,
-    backgroundColor: "#fff",
-  },
-
-  paymentSelected: {
-    borderColor: "#22C55E",
-    backgroundColor: "#ECFDF5",
   },
 
   iconCircle: {
     width: 38,
     height: 38,
     borderRadius: 999,
-    backgroundColor: "#F1F5F9",
     alignItems: "center",
     justifyContent: "center",
   },
 
-  paymentTitle: {
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-  paymentSub: {
-    fontSize: 12,
-    color: "#64748B",
-    marginTop: 2,
-  },
-
-  amountRow: {
-    marginTop: 8,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
-  },
-  amountLabel: { color: "#64748B", fontWeight: "700" },
-  amountValue: { color: "#0F172A", fontWeight: "900" },
+  paymentTitle: { fontWeight: "900" },
+  paymentSub: { fontSize: 12, marginTop: 2, fontWeight: "600" },
 
   payBtn: {
-    backgroundColor: "#0F766E",
     margin: 16,
     paddingVertical: 16,
     borderRadius: 18,
     alignItems: "center",
   },
-  payText: { color: "#fff", fontWeight: "900", fontSize: 16 },
+  payText: { fontWeight: "900", fontSize: 16 },
 });

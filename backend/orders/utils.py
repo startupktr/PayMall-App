@@ -1,4 +1,7 @@
 from decimal import Decimal, ROUND_HALF_UP
+import hashlib
+from django.utils import timezone
+
 
 def money(x: Decimal) -> Decimal:
     return Decimal(x).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -24,3 +27,20 @@ def split_gst_inclusive(inclusive_amount: Decimal, gst_rate: Decimal):
     sgst = gst_amount / Decimal("2.00")
 
     return money(taxable_value), money(gst_amount), money(cgst), money(sgst)
+
+
+def make_cart_hash(cart_items_queryset):
+    """
+    cart_items_queryset: CartItem queryset
+    """
+    parts = []
+    for it in cart_items_queryset.order_by("product_id"):
+        parts.append(f"{it.product_id}:{it.quantity}")
+    raw = "|".join(parts)
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def is_expired(order):
+    if not order.expires_at:
+        return False
+    return order.expires_at <= timezone.now()

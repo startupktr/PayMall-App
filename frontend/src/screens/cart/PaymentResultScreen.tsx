@@ -4,12 +4,7 @@ import api from "@/api/axios";
 import { Ionicons } from "@expo/vector-icons";
 
 type Props = {
-  route: {
-    params: {
-      success: boolean;
-      orderId: number;
-    };
-  };
+  route: { params: { success: boolean; orderId: number } };
   navigation: any;
 };
 
@@ -21,19 +16,23 @@ export default function PaymentResultScreen({ route, navigation }: Props) {
     try {
       setRetrying(true);
 
-      const res: any = await api.post("payments/initiate/", {
+      const res: any = await api.post("payments/create-attempt/", {
         order_id: orderId,
-        provider: "UPI",
+        provider: "MOCK",
       });
 
-      const paymentId = res?.data?.payment_id;
+      const ok = res?.success ?? true;
+      const data = res?.data ?? res;
+
+      if (!ok || !data?.attempt_id) {
+        setRetrying(false);
+        return;
+      }
 
       navigation.replace("PaymentProcessing", {
-        paymentId,
+        attemptId: data.attempt_id,
         orderId,
       });
-    } catch (e) {
-      setRetrying(false);
     } finally {
       setRetrying(false);
     }
@@ -45,7 +44,6 @@ export default function PaymentResultScreen({ route, navigation }: Props) {
       routes: [{ name: "Main" }],
     });
 
-    // ✅ go to orders tab after reset
     setTimeout(() => {
       navigation.navigate("Main", { screen: "OrderTab" });
     }, 50);
@@ -67,7 +65,7 @@ export default function PaymentResultScreen({ route, navigation }: Props) {
 
       <Text style={styles.subText}>
         {success
-          ? "Payment completed. You can view your exit OTP in Order Details."
+          ? "Payment completed. You can view your order in Orders."
           : "Your payment didn’t go through. You can retry safely."}
       </Text>
 
@@ -77,11 +75,7 @@ export default function PaymentResultScreen({ route, navigation }: Props) {
           onPress={retryPayment}
           disabled={retrying}
         >
-          {retrying ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.primaryText}>Retry Payment</Text>
-          )}
+          {retrying ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Retry Payment</Text>}
         </TouchableOpacity>
       )}
 
@@ -95,13 +89,7 @@ export default function PaymentResultScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 24,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#F8FAFC",
-  },
+  container: { flex: 1, padding: 24, justifyContent: "center", alignItems: "center", backgroundColor: "#F8FAFC" },
 
   iconWrap: {
     width: 74,
@@ -116,20 +104,8 @@ const styles = StyleSheet.create({
   okBg: { backgroundColor: "#ECFDF5" },
   failBg: { backgroundColor: "#FEF2F2" },
 
-  title: {
-    fontSize: 22,
-    fontWeight: "900",
-    color: "#0F172A",
-    marginBottom: 8,
-  },
-  subText: {
-    fontSize: 14,
-    color: "#64748B",
-    textAlign: "center",
-    lineHeight: 20,
-    marginBottom: 22,
-    maxWidth: 320,
-  },
+  title: { fontSize: 22, fontWeight: "900", color: "#0F172A", marginBottom: 8 },
+  subText: { fontSize: 14, color: "#64748B", textAlign: "center", lineHeight: 20, marginBottom: 22, maxWidth: 320 },
 
   primaryBtn: {
     backgroundColor: "#0F766E",
@@ -140,11 +116,7 @@ const styles = StyleSheet.create({
     minWidth: 220,
     alignItems: "center",
   },
-  primaryText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "900",
-  },
+  primaryText: { color: "#fff", fontSize: 16, fontWeight: "900" },
 
   secondaryBtn: {
     paddingVertical: 12,
@@ -156,8 +128,5 @@ const styles = StyleSheet.create({
     minWidth: 220,
     alignItems: "center",
   },
-  secondaryText: {
-    color: "#0F172A",
-    fontWeight: "800",
-  },
+  secondaryText: { color: "#0F172A", fontWeight: "800" },
 });

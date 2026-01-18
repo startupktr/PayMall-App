@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 import uuid
+from .utils import make_cart_hash, is_expired
 from common.responses import success_response, error_response
 from cart.models import Cart
 from .utils import split_gst_inclusive, money
@@ -60,46 +61,71 @@ class OrderDetailView(APIView):
         )
 
 
-class OrderCreateView(APIView):
+class OrderCheckoutView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     @transaction.atomic
     def post(self, request):
         mall_id = request.data.get("mall_id")
-        print(mall_id)
         if not mall_id:
-            return error_response(
-                message="mall_id is required",
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        
+            return error_response("mall_id is required", status=status.HTTP_400_BAD_REQUEST)
+
         cart = (
-            Cart.objects
-            .select_for_update()
+            Cart.objects.select_for_update()
             .filter(user=request.user, status="ACTIVE", mall_id=mall_id)
             .select_related("mall")
             .prefetch_related("items__product")
             .first()
         )
-        print(cart)
+
         if not cart or not cart.items.exists():
-            return error_response(
-                message="Cart is empty",
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return error_response("Cart is empty", status=status.HTTP_400_BAD_REQUEST)
 
-        existing = Order.objects.filter(
+        cart_hash = make_cart_hash(cart.items.all())
+
+        # ✅ Expire ALL expired pending orders (no cron needed)
+        Order.objects.filter(
             user=request.user,
+            mall=cart.mall,
             status="PAYMENT_PENDING",
-            mall=cart.mall
-        ).first()
+            expires_at__lte=timezone.now(),
+        ).update(status="EXPIRED")
 
-        if existing:
+        # ✅ Reuse pending order ONLY if same cart_hash and not expired
+        latest_pending = (
+            Order.objects.filter(
+                user=request.user,
+                mall=cart.mall,
+                status="PAYMENT_PENDING",
+                cart_hash=cart_hash,
+                expires_at__gt=timezone.now(),
+            )
+            .order_by("-created_at")
+            .first()
+        )
+
+        if latest_pending:
             return success_response(
-                message="Pending order already exists",
-                data=OrderDetailSerializer(existing).data,
+                message="Continuing existing pending order",
+                data=OrderDetailSerializer(latest_pending).data,
                 status=status.HTTP_200_OK,
             )
+
+        # ✅ Create fresh order snapshot
+        order = Order.objects.create(
+            user=request.user,
+            mall=cart.mall,
+            order_number=f"ORD-{uuid.uuid4().hex[:12].upper()}",
+            status="PAYMENT_PENDING",
+            cart_hash=cart_hash,
+            expires_at=timezone.now() + timedelta(minutes=15),
+            subtotal=Decimal("0.00"),
+            tax=Decimal("0.00"),
+            total=Decimal("0.00"),
+            cgst=Decimal("0.00"),
+            sgst=Decimal("0.00"),
+            igst=Decimal("0.00"),
+        )
 
         taxable_total = Decimal("0.00")
         gst_total = Decimal("0.00")
@@ -107,26 +133,10 @@ class OrderCreateView(APIView):
         sgst_total = Decimal("0.00")
         payable_total = Decimal("0.00")
 
-        order = Order.objects.create(
-            user=request.user,
-            mall=cart.mall,
-            order_number=f"ORD-{uuid.uuid4().hex[:12].upper()}",
-            status="PAYMENT_PENDING",
-            payment_status="PENDING",
-            subtotal=Decimal("0.00"),
-            tax=Decimal("0.00"),
-            total=Decimal("0.00"),
-            cgst=Decimal("0.00"),
-            sgst=Decimal("0.00"),
-            igst=Decimal("0.00"),
-            payment_expires_at=timezone.now() + timedelta(minutes=15),
-        )
-
         for item in cart.items.select_related("product").all():
             p = item.product
             qty = Decimal(item.quantity)
 
-            # ✅ inclusive pricing
             unit_price_inclusive = Decimal(p.price)
             line_total_inclusive = unit_price_inclusive * qty
 
@@ -170,15 +180,133 @@ class OrderCreateView(APIView):
         order.total = money(payable_total)
         order.save()
 
-        # ❌ DON'T CONVERT CART STATUS (causes UNIQUE crashes + guest cart issues)
-        # cart.status = "CONVERTED"
-        # cart.save(update_fields=["status"])
-
         return success_response(
-            message="Order created (GST inclusive)",
+            message="Order created",
             data=OrderDetailSerializer(order).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+
+# class OrderCreateView(APIView):
+#     permission_classes = [permissions.IsAuthenticated]
+
+#     @transaction.atomic
+#     def post(self, request):
+#         mall_id = request.data.get("mall_id")
+#         print(mall_id)
+#         if not mall_id:
+#             return error_response(
+#                 message="mall_id is required",
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+        
+#         cart = (
+#             Cart.objects
+#             .select_for_update()
+#             .filter(user=request.user, status="ACTIVE", mall_id=mall_id)
+#             .select_related("mall")
+#             .prefetch_related("items__product")
+#             .first()
+#         )
+#         print(cart)
+#         if not cart or not cart.items.exists():
+#             return error_response(
+#                 message="Cart is empty",
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+
+#         existing = Order.objects.filter(
+#             user=request.user,
+#             status="PAYMENT_PENDING",
+#             mall=cart.mall
+#         ).first()
+
+#         if existing:
+#             return success_response(
+#                 message="Pending order already exists",
+#                 data=OrderDetailSerializer(existing).data,
+#                 status=status.HTTP_200_OK,
+#             )
+
+#         taxable_total = Decimal("0.00")
+#         gst_total = Decimal("0.00")
+#         cgst_total = Decimal("0.00")
+#         sgst_total = Decimal("0.00")
+#         payable_total = Decimal("0.00")
+
+#         order = Order.objects.create(
+#             user=request.user,
+#             mall=cart.mall,
+#             order_number=f"ORD-{uuid.uuid4().hex[:12].upper()}",
+#             status="PAYMENT_PENDING",
+#             payment_status="PENDING",
+#             subtotal=Decimal("0.00"),
+#             tax=Decimal("0.00"),
+#             total=Decimal("0.00"),
+#             cgst=Decimal("0.00"),
+#             sgst=Decimal("0.00"),
+#             igst=Decimal("0.00"),
+#             payment_expires_at=timezone.now() + timedelta(minutes=15),
+#         )
+
+#         for item in cart.items.select_related("product").all():
+#             p = item.product
+#             qty = Decimal(item.quantity)
+
+#             # ✅ inclusive pricing
+#             unit_price_inclusive = Decimal(p.price)
+#             line_total_inclusive = unit_price_inclusive * qty
+
+#             gst_rate = Decimal(getattr(p, "gst_rate", Decimal("0.00")))
+
+#             unit_taxable, unit_gst, unit_cgst, unit_sgst = split_gst_inclusive(
+#                 inclusive_amount=unit_price_inclusive,
+#                 gst_rate=gst_rate,
+#             )
+
+#             line_taxable = unit_taxable * qty
+#             line_gst = unit_gst * qty
+#             line_cgst = unit_cgst * qty
+#             line_sgst = unit_sgst * qty
+
+#             taxable_total += line_taxable
+#             gst_total += line_gst
+#             cgst_total += line_cgst
+#             sgst_total += line_sgst
+#             payable_total += line_total_inclusive
+
+#             OrderItem.objects.create(
+#                 order=order,
+#                 product=p,
+#                 product_name=p.name,
+#                 product_price=money(unit_price_inclusive),
+#                 product_barcode=p.barcode,
+#                 quantity=item.quantity,
+#                 gst_rate=money(gst_rate),
+#                 taxable_value=money(line_taxable),
+#                 tax_amount=money(line_gst),
+#                 cgst_amount=money(line_cgst),
+#                 sgst_amount=money(line_sgst),
+#                 total_price=money(line_total_inclusive),
+#             )
+
+#         order.subtotal = money(taxable_total)
+#         order.tax = money(gst_total)
+#         order.cgst = money(cgst_total)
+#         order.sgst = money(sgst_total)
+#         order.total = money(payable_total)
+#         order.save()
+
+#         # ❌ DON'T CONVERT CART STATUS (causes UNIQUE crashes + guest cart issues)
+#         # cart.status = "CONVERTED"
+#         # cart.save(update_fields=["status"])
+
+#         return success_response(
+#             message="Order created (GST inclusive)",
+#             data=OrderDetailSerializer(order).data,
+#             status=status.HTTP_201_CREATED,
+#         )
 
 
 # def safe_str(x, fallback=""):

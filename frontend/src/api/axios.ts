@@ -5,7 +5,7 @@ import { pendingRequest } from "@/lib/pendingRequest";
 
 const URL = "http://192.168.1.4:8000";
 
-const api = axios.create({
+const api: any = axios.create({
   baseURL: `${URL}/api/`,
 });
 
@@ -14,11 +14,43 @@ export type RequestConfigWithMeta = {
   _retry?: boolean;
 };
 
+export type ApiEnvelope<T = any> = {
+  success: boolean;
+  message: string;
+  data: T | null;
+  errors: any;
+};
+
 let isRefreshing = false;
 let failedQueue: {
   resolve: (token: string) => void;
   reject: (err: any) => void;
 }[] = [];
+
+function normalizeEnvelope(payload: any): ApiEnvelope {
+  // Case 1: already in envelope format
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "success" in payload &&
+    "data" in payload
+  ) {
+    return {
+      success: Boolean(payload.success),
+      message: payload.message ?? "",
+      data: payload.data ?? null,
+      errors: payload.errors ?? null,
+    };
+  }
+
+  // Case 2: backend returned direct serializer data
+  return {
+    success: true,
+    message: "",
+    data: payload ?? null,
+    errors: null,
+  };
+}
 
 const processQueue = (error: any, token: string | null) => {
   failedQueue.forEach((prom) => {
@@ -48,7 +80,7 @@ api.interceptors.request.use(async (config: any) => {
    RESPONSE INTERCEPTOR
 ============================= */
 api.interceptors.response.use(
-  (response) => response.data,
+  (response) => normalizeEnvelope(response.data),
 
   async (error) => {
     const originalRequest = error.config as any as RequestConfigWithMeta & {

@@ -8,8 +8,9 @@ class CartItemInline(admin.TabularInline):
     readonly_fields = ('total_price',)
 
 class CartAdmin(admin.ModelAdmin):
-    list_display = ('user', 'total_items', 'subtotal', 'total_amount', 'updated_at')
+    list_display = ('user', 'updated_at')
     inlines = [CartItemInline]
-    readonly_fields = ('subtotal', 'total_amount')
+    # readonly_fields = ('subtotal', 'total_amount')
 
 admin.site.register(Cart, CartAdmin)
+admin.site.register(CartItem)

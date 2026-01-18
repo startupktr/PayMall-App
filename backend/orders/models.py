@@ -4,27 +4,19 @@ from products.models import Product
 from decimal import Decimal
 
 class Order(models.Model):
-    ORDER_STATUS = (
+    STATUS = (
         ('PAYMENT_PENDING', 'Payment Pending'),
         ('PAID', 'Paid'),
         ('FULFILLED', 'Fulfilled'),
         ('CANCELLED', 'Cancelled'),
         ('EXPIRED', 'Expired'),
     )
-    
-    PAYMENT_STATUS = (
-        ('PENDING', 'Pending'),
-        ('PAID', 'Paid'),
-        ('FAILED', 'Failed'),
-        ('REFUNDED', 'Refunded'),
-    )
 
     user = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name='orders')
     mall = models.ForeignKey(Mall, on_delete=models.SET_NULL, null=True, related_name='orders')
-    order_number = models.CharField(max_length=20, unique=True)
+    order_number = models.CharField(max_length=32, unique=True)
     
-    status = models.CharField(max_length=20, choices=ORDER_STATUS, default='PAYMENT_PENDING')
-    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS, default='PENDING')
+    status = models.CharField(max_length=20, choices=STATUS, default='PAYMENT_PENDING')
     
     cgst = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
     sgst = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
@@ -34,9 +26,10 @@ class Order(models.Model):
     tax = models.DecimalField(max_digits=10, decimal_places=2)
     total = models.DecimalField(max_digits=10, decimal_places=2)
     
-    payment_expires_at = models.DateTimeField()
-    payment_reference = models.CharField(max_length=100, blank=True, null=True)
-    is_paid = models.BooleanField(default=False)
+    cart_hash = models.CharField(max_length=64, blank=True, db_index=True)
+
+    expires_at = models.DateTimeField(null=True, blank=True)
+
     is_exited = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -45,6 +38,7 @@ class Order(models.Model):
         indexes = [
             models.Index(fields=["user", "status"]),
             models.Index(fields=["order_number"]),
+            models.Index(fields=["user", "mall", "status"]),
         ]
 
     def __str__(self):

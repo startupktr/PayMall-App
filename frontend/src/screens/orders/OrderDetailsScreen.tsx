@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -26,8 +26,6 @@ type OrderDetail = {
   id: number;
   order_number: string;
   status: string;
-  payment_status: string;
-  payment_method: string | null;
   subtotal: string;
   tax: string;
   total: string;
@@ -38,7 +36,11 @@ type OrderDetail = {
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> =
 {
   CREATED: { label: "Order Created", color: "#2563EB", bg: "#DBEAFE" },
-  PAYMENT_PENDING: { label: "Payment Pending", color: "#D97706", bg: "#FEF3C7" },
+  PAYMENT_PENDING: {
+    label: "Payment Pending",
+    color: "#D97706",
+    bg: "#FEF3C7",
+  },
   PAID: { label: "Paid", color: "#16A34A", bg: "#DCFCE7" },
   CANCELLED: { label: "Cancelled", color: "#DC2626", bg: "#FEE2E2" },
   EXPIRED: { label: "Expired", color: "#6B7280", bg: "#E5E7EB" },
@@ -46,134 +48,175 @@ const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> =
 
 export default function OrderDetailsScreen({ route, navigation }: any) {
   const { orderId } = route.params;
-  const isDark = useColorScheme() === "dark";
+
+  const scheme = useColorScheme();
+  const isDark = scheme === "dark";
 
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [retrying, setRetrying] = useState(false);
 
-  const fetchOrder = async () => {
+  // ✅ Theme colors (centralized)
+  const theme = useMemo(() => {
+    return {
+      bg: isDark ? "#020617" : "#F8FAFC",
+      headerBg: isDark ? "#0B1220" : "#FFFFFF",
+      cardBg: isDark ? "#0F172A" : "#FFFFFF",
+      border: isDark ? "#1E293B" : "#E2E8F0",
+      text: isDark ? "#F8FAFC" : "#0F172A",
+      subText: isDark ? "#94A3B8" : "#64748B",
+      divider: isDark ? "#1E293B" : "#E2E8F0",
+      btnBg: "#0F766E",
+      btnText: "#FFFFFF",
+    };
+  }, [isDark]);
+
+  const fetchOrder = useCallback(async () => {
+    /**
+     * ✅ Your axios interceptor returns response.data directly
+     * backend may return:
+     * A) envelope: { success, message, data }
+     * B) direct: { id, order_number, ... }
+     */
     const res: any = await api.get(`orders/${orderId}/`);
-    setOrder(res.data);
-  };
+
+    const ok = res?.success ?? true;
+    const data = res?.data ?? res;
+
+    if (!ok || !data?.id) {
+      throw new Error(res?.message || "Unable to fetch order");
+    }
+
+    setOrder(data);
+  }, [orderId]);
 
   useEffect(() => {
-    fetchOrder().finally(() => setLoading(false));
-  }, []);
+    fetchOrder()
+      .catch((e: any) => Alert.alert("Error", e?.message || "Unable to load order"))
+      .finally(() => setLoading(false));
+  }, [fetchOrder]);
 
+  // ✅ Pull-to-refresh
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await fetchOrder();
-    setRefreshing(false);
-  }, []);
+    try {
+      setRefreshing(true);
+      await fetchOrder();
+    } catch (e: any) {
+      Alert.alert("Error", e?.message || "Unable to refresh");
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchOrder]);
+
+  const statusMeta = useMemo(() => {
+    if (!order) return STATUS_MAP.CREATED;
+    return STATUS_MAP[order.status] || STATUS_MAP.CREATED;
+  }, [order]);
+
+  const canRetryPayment = useMemo(() => {
+    if (!order) return false;
+    return order.status === "PAYMENT_PENDING";
+  }, [order]);
+
+  const canDownloadInvoice = useMemo(() => {
+    if (!order) return false;
+    return order.status === "PAID";
+  }, [order]);
+
+  const retryPayment = async () => {
+    if (!order) return;
+
+    navigation.navigate("Main", {
+      screen: "CartTab",
+      params: {
+        screen: "Payment",
+        params: {
+          orderId: order.id, // ✅ only orderId needed
+        },
+      },
+    });
+  };
+
 
   if (loading || !order) {
     return (
-      <View style={styles.loader}>
-        <ActivityIndicator size="large" />
+      <View style={[styles.loader, { backgroundColor: theme.bg }]}>
+        <ActivityIndicator size="large" color={isDark ? "#93C5FD" : "#2563EB"} />
       </View>
     );
   }
 
-  // const DownloadInvoice = async () => {
-  //   try {
-  //     await downloadInvoice(order.id);
-  //   } catch (e: any) {
-  //     Alert.alert("Invoice Error", e?.message || "Unable to download invoice");
-  //   }
-  // };
-
-  const canRetryPayment =
-    order.status === "PAYMENT_PENDING" || order.payment_status === "FAILED";
-
-  const statusMeta = STATUS_MAP[order.status] || STATUS_MAP["CREATED"];
-
-  const retryPayment = async () => {
-    try {
-      setRetrying(true);
-
-      // ✅ creates new attempt or reuse pending
-      await api.post("payments/initiate/", {
-        order_id: order.id,
-        provider: "UPI",
-      });
-
-      // ✅ go to Payment screen inside CartTab stack
-      navigation.navigate("Main", {
-        screen: "CartTab",
-        params: {
-          screen: "Payment",
-          params: {
-            orderId: order.id,
-            amount: order.total,
-          },
-        },
-      });
-    } catch (err: any) {
-      Alert.alert(
-        "Retry failed",
-        err?.response?.data?.message || "Unable to retry payment"
-      );
-    } finally {
-      setRetrying(false);
-    }
-  };
-
   return (
-    <SafeAreaView
-      style={[styles.safe, { backgroundColor: isDark ? "#020617" : "#F8FAFC" }]}
-    >
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
       {/* HEADER */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={22} color="#0F172A" />
+      <View style={[styles.header, { backgroundColor: theme.headerBg, borderColor: theme.border }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 4 }}>
+          <Ionicons name="arrow-back" size={22} color={theme.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Order Details</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Order Details</Text>
       </View>
 
       <ScrollView
         contentContainerStyle={styles.container}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.text} // iOS spinner color
+          />
         }
       >
-        <Text style={[styles.orderNo, { color: isDark ? "#F8FAFC" : "#0F172A" }]}>
+        {/* ORDER NUMBER */}
+        <Text style={[styles.orderNo, { color: theme.text }]}>
           {order.order_number}
         </Text>
 
-        <View style={[styles.statusChip, { backgroundColor: statusMeta.bg }]}>
-          <Text style={{ color: statusMeta.color, fontWeight: "900" }}>
+        {/* STATUS CHIP */}
+        <View
+          style={[
+            styles.statusChip,
+            {
+              backgroundColor: isDark ? "#0B1220" : statusMeta.bg,
+              borderColor: theme.border,
+              borderWidth: 1,
+            },
+          ]}
+        >
+          <Text style={{ color: isDark ? theme.subText : statusMeta.color, fontWeight: "900" }}>
             {statusMeta.label}
           </Text>
         </View>
 
         {/* ITEMS */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Items</Text>
+        <View style={[styles.card, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Items</Text>
 
-          {order.items.map((item) => (
-            <View key={item.id} style={styles.itemRow}>
-              <Text style={styles.itemName}>
+          {order.items?.map((item) => (
+            <View key={item.id} style={[styles.itemRow, { borderColor: theme.divider }]}>
+              <Text style={[styles.itemName, { color: theme.text }]} numberOfLines={1}>
                 {item.quantity} × {item.product_name}
               </Text>
-              <Text style={styles.itemPrice}>₹{item.total_price}</Text>
+              <Text style={[styles.itemPrice, { color: theme.text }]}>
+                ₹{item.total_price}
+              </Text>
             </View>
           ))}
         </View>
 
         {/* BILL */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Bill Summary</Text>
+        <View style={[styles.card, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Bill Summary</Text>
 
-          <Row label="Taxable Value" value={order.subtotal} />
-          <Row label="GST" value={order.tax} />
-          <Row label="Total Paid" value={order.total} bold />
+          <Row label="Taxable Value" value={order.subtotal} theme={theme} />
+          <Row label="GST" value={order.tax} theme={theme} />
+          <Row label="Total Payable" value={order.total} bold theme={theme} />
         </View>
 
+        {/* RETRY */}
         {canRetryPayment && (
           <TouchableOpacity
-            style={[styles.primaryBtn, retrying && { opacity: 0.7 }]}
+            style={[styles.primaryBtn, { backgroundColor: theme.btnBg }, retrying && { opacity: 0.7 }]}
             onPress={retryPayment}
             disabled={retrying}
             activeOpacity={0.9}
@@ -181,16 +224,14 @@ export default function OrderDetailsScreen({ route, navigation }: any) {
             {retrying ? (
               <ActivityIndicator color="#FFF" />
             ) : (
-              <Text style={styles.primaryText}>Retry Payment</Text>
+              <Text style={[styles.primaryText, { color: theme.btnText }]}>Retry Payment</Text>
             )}
           </TouchableOpacity>
         )}
 
-        {!canRetryPayment && (
-          <DownloadInvoiceButton
-            order={order}
-            buttonText="Get Invoice PDF"
-          />
+        {/* INVOICE */}
+        {canDownloadInvoice && (
+          <DownloadInvoiceButton order={order} buttonText="Get Invoice PDF" />
         )}
       </ScrollView>
     </SafeAreaView>
@@ -201,15 +242,24 @@ function Row({
   label,
   value,
   bold,
+  theme,
 }: {
   label: string;
   value: string;
   bold?: boolean;
+  theme: {
+    text: string;
+    subText: string;
+  };
 }) {
   return (
     <View style={styles.rowBetween}>
-      <Text style={[styles.rowText, bold && { fontWeight: "900" }]}>{label}</Text>
-      <Text style={[styles.rowText, bold && { fontWeight: "900" }]}>₹{value}</Text>
+      <Text style={[styles.rowText, { color: theme.subText }, bold && { fontWeight: "900", color: theme.text }]}>
+        {label}
+      </Text>
+      <Text style={[styles.rowText, { color: theme.text }, bold && { fontWeight: "900" }]}>
+        ₹{value}
+      </Text>
     </View>
   );
 }
@@ -222,17 +272,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     padding: 16,
-    backgroundColor: "#fff",
     borderBottomWidth: 1,
-    borderColor: "#E2E8F0",
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: "900",
-    color: "#0F172A",
   },
 
   container: { padding: 20, paddingBottom: 140 },
+
   loader: { flex: 1, justifyContent: "center", alignItems: "center" },
 
   orderNo: { fontSize: 22, fontWeight: "900" },
@@ -246,12 +294,10 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    backgroundColor: "#fff",
     borderRadius: 18,
     padding: 16,
     marginTop: 18,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
   },
   sectionTitle: { fontSize: 16, fontWeight: "900", marginBottom: 12 },
 
@@ -260,36 +306,21 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 8,
   },
-  itemName: { fontSize: 14, color: "#0F172A" },
-  itemPrice: { fontSize: 14, fontWeight: "800", color: "#0F172A" },
+  itemName: { fontSize: 14, flex: 1, paddingRight: 10 },
+  itemPrice: { fontSize: 14, fontWeight: "800" },
 
   rowBetween: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginVertical: 6,
   },
-  rowText: { fontSize: 14, color: "#0F172A" },
+  rowText: { fontSize: 14 },
 
   primaryBtn: {
-    backgroundColor: "#0F766E",
     paddingVertical: 16,
     borderRadius: 16,
     marginTop: 26,
     alignItems: "center",
   },
-  primaryText: { color: "#FFF", fontSize: 16, fontWeight: "900" },
-  invoiceBtn: {
-    backgroundColor: "#2563EB",
-    paddingVertical: 14,
-    borderRadius: 14,
-    marginTop: 14,
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 10,
-  },
-  invoiceBtnText: {
-    color: "#fff",
-    fontWeight: "900",
-  },
+  primaryText: { fontSize: 16, fontWeight: "900" },
 });

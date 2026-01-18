@@ -12,11 +12,14 @@ from django.db import transaction
 from django.db.models import F
 from products.models import Product
 from orders.models import ExitOTP
-from .models import PaymentMethod
-from cart.models import Cart
+from .models import PaymentMethod, PaymentAttempt
+from cart.models import Cart, CartItem
 from .serializers import PaymentMethodSerializer
 from common.responses import success_response, error_response
 from products.services import check_inventory_alert
+from decimal import Decimal
+from orders.utils import is_expired
+
 
 class InitiatePaymentView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -39,7 +42,7 @@ class InitiatePaymentView(APIView):
         )
 
         # ✅ already paid
-        if order.status == "PAID" or order.payment_status == "PAID":
+        if order.status == "PAID":
             return error_response(
                 message="Order already paid",
                 status=status.HTTP_400_BAD_REQUEST,
@@ -313,3 +316,161 @@ class PaymentMethodDetailView(generics.RetrieveUpdateDestroyAPIView):
             status=status.HTTP_200_OK,
         )
 
+
+class CreatePaymentAttemptView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request):
+        order_id = request.data.get("order_id")
+        provider = request.data.get("provider", "MOCK")
+
+        if not order_id:
+            return error_response("order_id is required", status=status.HTTP_400_BAD_REQUEST)
+
+        order = (
+            Order.objects.select_for_update()
+            .filter(id=order_id, user=request.user)
+            .first()
+        )
+
+        if not order:
+            return error_response("Order not found", status=status.HTTP_404_NOT_FOUND)
+
+        # ✅ Lazy expire (no job needed)
+        if order.status == "PAYMENT_PENDING" and order.expires_at and order.expires_at <= timezone.now():
+            order.status = "EXPIRED"
+            order.save(update_fields=["status"])
+            return error_response("Order expired", status=status.HTTP_400_BAD_REQUEST)
+
+        if order.status != "PAYMENT_PENDING":
+            return error_response("Order is not payable now", status=status.HTTP_400_BAD_REQUEST)
+
+        # ✅ If there is an existing PENDING attempt, return it (optional, prevents spam)
+        existing_attempt = (
+            PaymentAttempt.objects.filter(order=order, status="PENDING")
+            .order_by("-attempt_no")
+            .first()
+        )
+        if existing_attempt:
+            return success_response(
+                message="Payment attempt already exists",
+                data={
+                    "attempt_id": existing_attempt.id,
+                    "order_id": order.id,
+                    "amount": str(existing_attempt.amount),
+                    "provider": existing_attempt.provider,
+                    "provider_order_id": existing_attempt.provider_order_id,
+                    "status": existing_attempt.status,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        last_attempt = PaymentAttempt.objects.filter(order=order).order_by("-attempt_no").first()
+        attempt_no = 1 if not last_attempt else last_attempt.attempt_no + 1
+
+        attempt = PaymentAttempt.objects.create(
+            order=order,
+            provider=provider,
+            status="CREATED",
+            attempt_no=attempt_no,
+            amount=Decimal(order.total),
+        )
+
+        # ✅ Create provider order at gateway here
+        # Example: attempt.provider_order_id = razorpay_client.order.create(...)
+        # For now: mock
+        attempt.provider_order_id = f"MOCK_{order.order_number}_{attempt_no}"
+        attempt.status = "PENDING"
+        attempt.save(update_fields=["provider_order_id", "status"])
+
+        return success_response(
+            message="Payment attempt created",
+            data={
+                "attempt_id": attempt.id,
+                "order_id": order.id,
+                "amount": str(attempt.amount),
+                "provider": attempt.provider,
+                "provider_order_id": attempt.provider_order_id,
+                "status": attempt.status,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+class VerifyPaymentView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request):
+        attempt_id = request.data.get("attempt_id")
+        success = request.data.get("success", False)
+        provider_payment_id = request.data.get("provider_payment_id")
+        error_message = request.data.get("error_message", "Payment failed")
+
+        if not attempt_id:
+            return error_response("attempt_id is required", status=status.HTTP_400_BAD_REQUEST)
+
+        attempt = (
+            PaymentAttempt.objects.select_for_update()
+            .select_related("order")
+            .filter(id=attempt_id, order__user=request.user)
+            .first()
+        )
+
+        if not attempt:
+            return error_response("Payment attempt not found", status=status.HTTP_404_NOT_FOUND)
+
+        order = attempt.order
+
+        # ✅ Lazy expire
+        if order.status == "PAYMENT_PENDING" and order.expires_at and order.expires_at <= timezone.now():
+            order.status = "EXPIRED"
+            order.save(update_fields=["status"])
+
+            attempt.status = "EXPIRED"
+            attempt.save(update_fields=["status"])
+
+            return error_response("Order expired", status=status.HTTP_400_BAD_REQUEST)
+
+        if order.status != "PAYMENT_PENDING":
+            return error_response("Order is not payable now", status=status.HTTP_400_BAD_REQUEST)
+
+        if attempt.status == "SUCCESS":
+            # ✅ already paid
+            return success_response(
+                message="Already verified",
+                data={"order_id": order.id, "status": order.status},
+                status=status.HTTP_200_OK,
+            )
+
+        if success:
+            attempt.status = "SUCCESS"
+            attempt.provider_payment_id = provider_payment_id
+            attempt.save(update_fields=["status", "provider_payment_id"])
+
+            order.status = "PAID"
+            order.save(update_fields=["status"])
+
+            # ✅ Clear cart items only on successful payment
+            CartItem.objects.filter(
+                cart__user=request.user,
+                cart__mall=order.mall,
+                cart__status="ACTIVE"
+            ).delete()
+
+            return success_response(
+                message="Payment successful",
+                data={"order_id": order.id, "status": order.status},
+                status=status.HTTP_200_OK,
+            )
+
+        # ✅ failure (keep order PAYMENT_PENDING so user can retry within expiry)
+        attempt.status = "FAILED"
+        attempt.error_message = error_message
+        attempt.save(update_fields=["status", "error_message"])
+
+        return success_response(
+            message="Payment failed (you can retry)",
+            data={"order_id": order.id, "status": order.status},
+            status=status.HTTP_200_OK,
+        )

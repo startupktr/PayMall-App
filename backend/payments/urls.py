@@ -4,7 +4,9 @@ from .views import (
     PaymentSuccessView,
     PaymentFailedView,
     PaymentMethodListView,
-    PaymentMethodDetailView
+    PaymentMethodDetailView,
+    CreatePaymentAttemptView,
+    VerifyPaymentView
 )
 
 urlpatterns = [
@@ -15,4 +17,7 @@ urlpatterns = [
     # Payment methods
     path('payment-methods/', PaymentMethodListView.as_view(), name='payment_method_list'),
     path('payment-methods/<int:pk>/', PaymentMethodDetailView.as_view(), name='payment_method_detail'),
+
+    path("create-attempt/", CreatePaymentAttemptView.as_view(), name="payment-attempt"),
+    path("verify/", VerifyPaymentView.as_view(), name="payment-verify"),
 ]

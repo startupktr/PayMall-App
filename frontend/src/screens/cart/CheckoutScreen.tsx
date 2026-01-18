@@ -16,29 +16,32 @@ import { useCart } from "@/context/CartContext";
 export default function CheckoutScreen({ navigation, route }: any) {
   const { mall_id } = route.params || {};
   const { cart } = useCart();
+
   const [loading, setLoading] = useState(false);
   const [showTax, setShowTax] = useState(false);
 
-  const createOrder = async () => {
+  const createOrReuseOrder = async () => {
     try {
       setLoading(true);
 
-      // ✅ backend creates order with POS GST breakup
-      const res = await api.post("orders/create/", {mall_id});
-      console.log("res:", res)
-      if (!res.data.success) {
-        Alert.alert("Error", res.data.message || "Unable to create order");
+      // ✅ industry endpoint
+      const res: any = await api.post("orders/checkout/", { mall_id });
+
+      // if you return envelope from backend -> res.success exists
+      // if backend returns direct order -> res.success undefined
+      const success = res?.success ?? true;
+      const order = res?.data ?? res;
+
+      if (!success || !order?.id) {
+        Alert.alert("Error", res?.message || "Unable to checkout");
         return;
       }
 
-      const order = res.data;
-
       navigation.navigate("Payment", {
         orderId: order.id,
-        amount: order.total, // payable total inclusive
       });
     } catch (err) {
-      console.log("CREATE ORDER ERROR:", err);
+      console.log("CHECKOUT ERROR:", err);
       Alert.alert("Error", "Unable to create order");
     } finally {
       setLoading(false);
@@ -49,7 +52,6 @@ export default function CheckoutScreen({ navigation, route }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} />
@@ -58,7 +60,6 @@ export default function CheckoutScreen({ navigation, route }: any) {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
-        {/* ITEMS */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Items</Text>
 
@@ -80,12 +81,14 @@ export default function CheckoutScreen({ navigation, route }: any) {
           )}
         </View>
 
-        {/* BILL SUMMARY */}
         <View style={styles.card}>
           <View style={styles.billHeader}>
             <Text style={styles.cardTitle}>Bill Summary</Text>
 
-            <TouchableOpacity onPress={() => setShowTax((p) => !p)} style={styles.breakupBtn}>
+            <TouchableOpacity
+              onPress={() => setShowTax((p) => !p)}
+              style={styles.breakupBtn}
+            >
               <Text style={styles.breakupText}>
                 {showTax ? "Hide breakup" : "Show breakup"}
               </Text>
@@ -97,8 +100,11 @@ export default function CheckoutScreen({ navigation, route }: any) {
             </TouchableOpacity>
           </View>
 
-          {/* ✅ POS style values */}
-          <BillRow label="Total Payable (Incl. GST)" value={Number(cart?.total_amount || 0)} bold />
+          <BillRow
+            label="Total Payable (Incl. GST)"
+            value={Number(cart?.total_amount || 0)}
+            bold
+          />
 
           {showTax && (
             <View style={styles.breakupBox}>
@@ -112,12 +118,15 @@ export default function CheckoutScreen({ navigation, route }: any) {
         </View>
       </ScrollView>
 
-      {/* PAY BUTTON */}
-      <TouchableOpacity style={[styles.payBtn, loading && { opacity: 0.7 }]} onPress={createOrder} disabled={loading}>
+      <TouchableOpacity
+        style={[styles.payBtn, loading && { opacity: 0.7 }]}
+        onPress={createOrReuseOrder}
+        disabled={loading}
+      >
         {loading ? (
           <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
             <ActivityIndicator color="#fff" />
-            <Text style={styles.payText}>Creating Order...</Text>
+            <Text style={styles.payText}>Preparing...</Text>
           </View>
         ) : (
           <Text style={styles.payText}>Proceed to Pay</Text>
@@ -172,7 +181,12 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 
-  cardTitle: { fontSize: 16, fontWeight: "900", marginBottom: 12, color: "#0F172A" },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    marginBottom: 12,
+    color: "#0F172A",
+  },
 
   row: {
     flexDirection: "row",

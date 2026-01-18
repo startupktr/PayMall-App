@@ -3,14 +3,13 @@ from django.conf import settings
 from products.models import Product
 from malls.models import Mall
 from decimal import Decimal
+from django.db.models import Q
 
 User = settings.AUTH_USER_MODEL
 
 class Cart(models.Model):
     CART_STATUS = (
         ("ACTIVE", "Active"),
-        ("CONVERTED", "Converted to Order"),
-        ("ABANDONED", "Abandoned"),
     )
 
     user = models.ForeignKey("accounts.User", on_delete=models.CASCADE)
@@ -24,22 +23,29 @@ class Cart(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        unique_together = ("user", "mall", "status")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "mall"],
+                condition=Q(status="ACTIVE"),
+                name="unique_active_cart_per_user_mall",
+            )
+        ]
         indexes = [
             models.Index(fields=["user", "status"]),
+            models.Index(fields=["user", "mall"]),
         ]
     
-    @property
-    def total_items(self):
-        return self.items.count()
+    # @property
+    # def total_items(self):
+    #     return self.items.count()
     
-    @property
-    def subtotal(self):
-        return sum((item.total_price for item in self.items.all()), Decimal("0.00"))
+    # @property
+    # def subtotal(self):
+    #     return sum((item.total_price for item in self.items.all()), Decimal("0.00"))
     
-    @property
-    def total_amount(self):
-        return self.subtotal
+    # @property
+    # def total_amount(self):
+    #     return self.subtotal
 
     def __str__(self):
         return f"{self.user} - {self.mall}"
@@ -53,7 +59,9 @@ class CartItem(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ('cart', 'product')
+        constraints = [
+            models.UniqueConstraint(fields=["cart", "product"], name="unique_cart_product")
+        ]
     
     def __str__(self):
         return f"{self.product.name} ({self.quantity}) - {self.cart.user.email}"
