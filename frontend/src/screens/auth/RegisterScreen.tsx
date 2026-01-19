@@ -83,7 +83,7 @@ export default function RegisterScreen({ navigation }: any) {
           >
             {/* LOGO */}
             <Image
-              source={require("@/../assets/Splash-Icon.jpeg")}
+              source={require("@/../assets/Splash-Icon.png")}
               style={styles.image}
             />
 
