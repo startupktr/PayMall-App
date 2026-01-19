@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "PayMall",
+    "slug": "paymall",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/Splash-Icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "experiments": {
@@ -20,7 +20,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/Splash-Icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
@@ -48,6 +48,12 @@
       "eas": {
         "projectId": "b852c793-4f3d-4bf6-a977-c77a9a31a648"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/b852c793-4f3d-4bf6-a977-c77a9a31a648"
     }
   }
 }

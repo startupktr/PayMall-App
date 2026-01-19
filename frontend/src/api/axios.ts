@@ -3,7 +3,7 @@ import * as SecureStore from "expo-secure-store";
 import { authEvents } from "@/lib/authEvents";
 import { pendingRequest } from "@/lib/pendingRequest";
 
-const URL = "http://192.168.1.4:8000";
+const URL = "http://98.92.67.194";
 
 const api: any = axios.create({
   baseURL: `${URL}/api/`,
