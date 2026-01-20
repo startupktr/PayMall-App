@@ -6,6 +6,10 @@ from django.utils.timezone import now
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from common.responses import success_response, error_response
+import os
+
+
+max_distance = os.getenv('MAX_DISTANCE')  # meters
 
 def haversine(lat1, lon1, lat2, lon2):
     R = 6371000
@@ -27,8 +31,6 @@ class NearbyMallView(APIView):
                 message="Invalid latitude or longitude",
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
-        max_distance = 6000  # meters (can move to settings)
 
         malls = []
         for mall in Mall.objects.filter(is_active=True):
