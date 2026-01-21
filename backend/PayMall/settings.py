@@ -15,8 +15,14 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = ['*']
-
+ALLOWED_HOSTS = [
+    "api.paymall.live",
+    "paymall.live",
+    "merchant.paymall.live",
+    "www.paymall.live",
+    "localhost",
+    "127.0.0.1",
+]
 
 # Application definition
 
@@ -163,10 +169,10 @@ SIMPLE_JWT = {
     "AUTH_COOKIE": "access_token",
     "AUTH_COOKIE_REFRESH": "refresh_token",
 
-    "AUTH_COOKIE_SECURE": False,  # True in production (HTTPS)
+    "AUTH_COOKIE_SECURE": True,  # True in production (HTTPS)
     "AUTH_COOKIE_HTTP_ONLY": True,
     "AUTH_COOKIE_PATH": "/",
-    "AUTH_COOKIE_SAMESITE": "Lax",  # "None" + Secure=True for cross-domain
+    "AUTH_COOKIE_SAMESITE": "None",  # "None" + Secure=True for cross-domain
 }
 
 
@@ -174,6 +180,10 @@ SIMPLE_JWT = {
 AUTH_USER_MODEL = 'accounts.User'
 
 CORS_ALLOWED_ORIGINS = [
+    "https://paymall.live",
+    "https://www.paymall.live",
+    "https://merchant.paymall.live",
+
     "http://localhost:8080",
     "http://127.0.0.1:8080",
 ]
@@ -187,15 +197,30 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 
 
 CSRF_TRUSTED_ORIGINS = [
+    "https://paymall.live",
+    "https://www.paymall.live",
+    "https://merchant.paymall.live",
+    "https://api.paymall.live",
+
+    # local dev
     "http://localhost:8080",
     "http://127.0.0.1:8080",
 ]
+CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_SAMESITE = "None"
 
 CORS_ALLOW_HEADERS = [
     "accept",
+    "accept-encoding",
     "authorization",
     "content-type",
+    "dnt",
+    "origin",
     "user-agent",
     "x-csrftoken",
     "x-requested-with",
 ]
+
+CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

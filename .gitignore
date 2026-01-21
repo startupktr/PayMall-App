@@ -30,6 +30,10 @@ frontend/.env
 frontend/.env.*
 frontend/*.env
 
+frontend-admin/.env
+frontend-admin/.env.*
+frontend-admin/*.env
+
 # =========================
 # Common
 # =========================
