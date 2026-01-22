@@ -3,8 +3,8 @@ import * as SecureStore from "expo-secure-store";
 import { authEvents } from "@/lib/authEvents";
 import { pendingRequest } from "@/lib/pendingRequest";
 
-// const URL = "https://api.paymall.live";
-const URL = "http://127.0.0.1:8000"
+const URL = "https://api.paymall.live";
+// const URL = "http://127.0.0.1:8000"
 
 const api: any = axios.create({
   baseURL: `${URL}/api/`,

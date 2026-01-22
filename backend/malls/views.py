@@ -9,7 +9,7 @@ from common.responses import success_response, error_response
 import os
 
 
-max_distance = os.getenv('MAX_DISTANCE')  # meters
+MAX_DISTANCE = float(os.getenv("MAX_DISTANCE", "5000"))  # default 5km
 
 def haversine(lat1, lon1, lat2, lon2):
     R = 6371000
@@ -33,10 +33,10 @@ class NearbyMallView(APIView):
             )
 
         malls = []
-        for mall in Mall.objects.filter(is_active=True):
+        for mall in Mall.objects.filter(is_active=True).only("id", "name", "latitude", "longitude"):
             dist = haversine(lat, lng, mall.latitude, mall.longitude)
             
-            if dist <= max_distance:
+            if dist <= MAX_DISTANCE:
                 mall.distance = round(dist, 2)
                 malls.append(mall)
 
