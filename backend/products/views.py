@@ -115,7 +115,7 @@ class ProductDetailView(APIView):
 
         return success_response(
             message="Product details fetched successfully",
-            data=ProductDetailSerializer(product).data,
+            data=ProductDetailSerializer(product, context={"request": request}).data,
             status=status.HTTP_200_OK,
         )
 
@@ -149,6 +149,6 @@ class ProductBarcodeView(APIView):
 
         return success_response(
             message="Product found",
-            data=ProductDetailSerializer(product).data,
+            data=ProductDetailSerializer(product, context={"request": request}).data,
             status=status.HTTP_200_OK,
         )

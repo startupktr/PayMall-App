@@ -27,6 +27,7 @@ type Product = {
   id: number;
   name: string;
   price: number;
+  marked_price: number;
   image?: string | null;
 };
 
@@ -266,6 +267,7 @@ export default function MallDetailsScreen({ route, navigation }: any) {
                   </Text>
 
                   <Text style={styles.price}>₹{item.price}</Text>
+                  {item.marked_price > item.price && <Text style={styles.mrp}>₹{Number(item.marked_price).toFixed(2)}</Text>}
                 </TouchableOpacity>
 
                 {/* <TouchableOpacity style={styles.addBtn} onPress={() => handleAdd(item)}>
@@ -354,7 +356,7 @@ const styles = StyleSheet.create({
 
   card: {
     width: "48%",
-    backgroundColor: "#fff",
+    backgroundColor: "#E6F4F1",
     borderRadius: 18,
     padding: 12,
     marginBottom: 14,
@@ -375,9 +377,14 @@ const styles = StyleSheet.create({
   },
   placeholderText: { fontSize: 32, fontWeight: "900", color: "#0F172A" },
 
-  name: { fontWeight: "800", marginTop: 8, color: "#0F172A", minHeight: 38 },
-  price: { color: "#0F766E", fontWeight: "900", marginTop: 4 },
-
+  name: { fontWeight: "800", marginTop: 8, color: "#0F172A", minHeight: 20 },
+  price: { color: "#0F766E", fontWeight: "900" },
+  mrp: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#94A3B8",
+    textDecorationLine: "line-through",
+  },
   addBtn: {
     marginTop: 10,
     backgroundColor: "#4F46E5",
