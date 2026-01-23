@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
     },
 
     tile: {
-        width: 165, // keeps consistent width animation
+        width: 155, // keeps consistent width animation
         backgroundColor: "#fff",
         borderRadius: 18,
         padding: 14,

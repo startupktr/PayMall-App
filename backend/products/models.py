@@ -23,6 +23,12 @@ class Category(models.Model):
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
 
+    @property
+    def image_url(self):
+        if self.image and hasattr(self.image, 'url'):
+            return self.image.url
+        return ""
+    
     def __str__(self):
         return self.name
 
@@ -91,6 +97,12 @@ class Product(models.Model):
             discount = ((self.marked_price - self.price) / self.marked_price) * 100
             self.discount_percentage = round(discount, 2)
         super().save(*args, **kwargs)
+
+    @property
+    def image_url(self):
+        if self.image and hasattr(self.image, 'url'):
+            return self.image.url
+        return ""
     
     def __str__(self):
         return f"{self.name} - {self.barcode}"

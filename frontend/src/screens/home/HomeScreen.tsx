@@ -17,6 +17,7 @@ import MallCard from "@/components/MallCard";
 import { GlobalOffer } from "@/types/offer";
 import { useFocusEffect } from "@react-navigation/native";
 import { useMall } from "@/context/MallContext";
+import { useColorScheme } from "react-native";
 
 /* ================= TYPES ================= */
 
@@ -43,6 +44,8 @@ export default function HomeScreen({ navigation }: any) {
   const [search, setSearch] = useState("");
   const { setSelectedMall } = useMall();
   const [formatted, setFormatted] = useState(null);
+  const scheme = useColorScheme();
+  const isDark = scheme === "dark";
 
   /* ================= INITIAL LOAD ================= */
   useFocusEffect(
@@ -196,7 +199,7 @@ export default function HomeScreen({ navigation }: any) {
   /* ================= RENDER ================= */
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: isDark ? "#0B1220" : "#F1F5F9" }]}>
       <HomeHeader
         showLocationBar={false}
         showLocationTextBelowLogo
@@ -225,8 +228,10 @@ export default function HomeScreen({ navigation }: any) {
           />
         )}
 
-        <Text style={styles.sectionTitle}>Malls Nearby</Text>
-
+        <Text style={[styles.sectionTitle, { color: isDark ? "#F8FAFC" : "#020617" }]}>
+          Malls Nearby
+        </Text>
+        
         <View style={styles.grid}>
           {filteredMalls
             .slice(0, showAllMalls ? filteredMalls.length : 4)

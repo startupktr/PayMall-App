@@ -3,6 +3,9 @@ import * as SecureStore from "expo-secure-store";
 import api from "@/api/axios";
 import { useCart } from "@/context/CartContext";
 import { postLoginRedirect } from "@/lib/postLoginRedirect";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { STORAGE_KEYS } from "@/utils/storageKeys";
+import { navigationRef } from "@/navigation/navigationRef";
 
 type AuthContextType = {
   user: any;
@@ -29,6 +32,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     restoreSession();
   }, []);
+  
+
+  const routeAfterAuth = async () => {
+    try {
+      const seen = await AsyncStorage.getItem(STORAGE_KEYS.ONBOARDING_SEEN);
+
+      // ✅ First time login → show onboarding
+      if (seen !== "true") {
+        navigationRef.current?.navigate("Onboarding");
+        return;
+      }
+
+      // ✅ already seen → go to Main (Home)
+      navigationRef.current?.navigate("Main");
+    } catch {
+      // fallback
+      navigationRef.current?.navigate("Main");
+    }
+  };
 
   const restoreSession = async () => {
     try {
@@ -73,6 +95,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     } catch { }
 
+    await routeAfterAuth();
+
     return res.data.user;
   };
 
@@ -103,6 +127,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         await fetchCart();
       }
     } catch { }
+
+    await routeAfterAuth();
 
     return res.data.user;
   };

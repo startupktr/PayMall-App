@@ -73,6 +73,12 @@ class Profile(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    @property
+    def avatar_url(self):
+        if self.avatar and hasattr(self.avatar, 'url'):
+            return self.avatar.url
+        return ""
+
 class UserRole(models.Model):
     class Role(models.TextChoices):
         CUSTOMER = "CUSTOMER"

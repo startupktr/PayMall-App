@@ -1,7 +1,9 @@
 import React, { useEffect, useRef } from "react";
-import { View, Text, StyleSheet, Image, Animated } from "react-native";
+import { View, Text, StyleSheet, Animated } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useAuth } from "@/context/AuthContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { STORAGE_KEYS } from "@/utils/storageKeys";
 
 type Props = NativeStackScreenProps<any>;
 
@@ -13,7 +15,6 @@ export default function SplashScreen({ navigation }: Props) {
   const textTranslate = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
-    // 🎬 Start animation
     Animated.parallel([
       Animated.timing(logoScale, {
         toValue: 1,
@@ -35,13 +36,26 @@ export default function SplashScreen({ navigation }: Props) {
   }, []);
 
   useEffect(() => {
-    if (!loading) {
-      const timer = setTimeout(() => {
-        navigation.replace(user ? "Main" : "Auth");
-      }, 2500);
+    if (loading) return;
 
-      return () => clearTimeout(timer);
-    }
+    const timer = setTimeout(async () => {
+      // ✅ Not logged in
+      if (!user) {
+        navigation.replace("Auth");
+        return;
+      }
+
+      // ✅ Logged in: show onboarding only once
+      const seen = await AsyncStorage.getItem(STORAGE_KEYS.ONBOARDING_SEEN);
+
+      if (seen !== "true") {
+        navigation.replace("Onboarding");
+      } else {
+        navigation.replace("Main");
+      }
+    }, 1800); // little faster feels better
+
+    return () => clearTimeout(timer);
   }, [loading, user]);
 
   return (
@@ -57,9 +71,7 @@ export default function SplashScreen({ navigation }: Props) {
         ]}
       />
 
-      <Animated.View
-        style={{ transform: [{ translateY: textTranslate }] }}
-      >
+      <Animated.View style={{ transform: [{ translateY: textTranslate }] }}>
         <Text style={styles.title}>PayMall</Text>
         <Text style={styles.tagline}>Scan • Pay • Go</Text>
       </Animated.View>

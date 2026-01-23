@@ -8,6 +8,7 @@ export type RootStackParamList = {
   } | undefined;
   Main: undefined;
   ProductDetails: undefined;
+  Onboarding: undefined;
 };
 
 /* ================= TABS ================= */

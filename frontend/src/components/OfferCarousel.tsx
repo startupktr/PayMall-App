@@ -100,6 +100,9 @@ export default function OfferCarousel({ offers, onPress }: Props) {
         data={loopData}
         horizontal
         pagingEnabled
+        snapToInterval={width}           // ✅ snap properly
+        decelerationRate="fast"          // ✅ iOS smooth
+        snapToAlignment="start"          // ✅ no mid-stuck
         showsHorizontalScrollIndicator={false}
         keyExtractor={(_, i) => `offer-${i}`}
         onMomentumScrollEnd={onMomentumEnd}
@@ -114,16 +117,7 @@ export default function OfferCarousel({ offers, onPress }: Props) {
             onPress={() => onPress(item.mall_id)}
             style={styles.bannerWrap}
           >
-            {item.image ? (
-              <Image source={{ uri: item.image }} style={styles.bannerImage} />
-            ) : (
-              <View style={styles.fallback}>
-                {/* If no image, show first letter of title or mall name */}
-                <View style={styles.fallbackBox}>
-                  {/* Keep empty if you want just grey */}
-                </View>
-              </View>
-            )}
+            <Image source={{ uri: item.image }} style={styles.bannerImage} />
           </TouchableOpacity>
         )}
       />
@@ -146,19 +140,23 @@ export default function OfferCarousel({ offers, onPress }: Props) {
 const styles = StyleSheet.create({
   bannerWrap: {
     width,
+    alignItems: "center",
+    justifyContent: "center",
     // paddingHorizontal: 1,
+    left: -15
   },
 
   bannerImage: {
-    width: "90%",
-    height: 190,
+    width: "91%",
+    height: 164,
     borderRadius: 16,
-    // resizeMode: "cover",
+    resizeMode: "contain",
+    backgroundColor: "#111"
   },
 
   fallback: {
-    width: "90%",
-    height: 190,
+    width: "91%",
+    height: 164,
     borderRadius: 16,
     backgroundColor: "#E2E8F0",
     overflow: "hidden",
