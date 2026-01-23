@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
   },
 
   hero: {
-    backgroundColor: "#fff",
+    backgroundColor: "#E6F4F1",
     paddingTop: Platform.OS === "android" ? 62 : 92,
     paddingBottom: 14,
     // borderRadius: 24,
@@ -390,6 +390,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 24,
   },
+  
   heroFallbackText: {
     fontSize: 88,
     fontWeight: "900",
@@ -411,6 +412,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#c0cee0",
   },
   badgeText: { fontWeight: "900", fontSize: 12 },
 
