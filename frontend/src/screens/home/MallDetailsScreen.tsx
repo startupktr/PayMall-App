@@ -48,7 +48,7 @@ export default function MallDetailsScreen({ route, navigation }: any) {
   const { mallId } = route.params;
 
   const { setSelectedMall } = useMall();
-  const { addToCart, fetchCart, cart, isGuest } = useCart();
+  const { fetchCart, cart, isGuest } = useCart();
 
   /* ---------- DATA ---------- */
   const [products, setProducts] = useState<Product[]>([]);

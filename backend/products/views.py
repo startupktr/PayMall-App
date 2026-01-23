@@ -39,7 +39,7 @@ class MallCategoryListView(APIView):
 
         return success_response(
             message="Mall categories fetched successfully",
-            data=CategorySerializer(qs, many=True).data,
+            data=CategorySerializer(qs, many=True, context={"request": request}).data,
             status=status.HTTP_200_OK,
         )
 
@@ -92,7 +92,7 @@ class ProductListView(APIView):
         elif sort == "Popular":
             queryset = queryset.order_by("-created_at")  # replace with real field if available
 
-        serialized = ProductSerializer(queryset, many=True).data
+        serialized = ProductSerializer(queryset, many=True, context={"request": request}).data
 
         return success_response(
             message="Products fetched successfully",

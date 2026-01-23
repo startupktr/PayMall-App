@@ -136,7 +136,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
       <StatusBar barStyle="dark-content" />
 
       {/* Floating Top Bar */}
-      <View style={styles.topBar}>
+      {/* <View style={styles.topBar}>
         <TouchableOpacity
           style={styles.iconBtn}
           onPress={() => navigation.goBack()}
@@ -160,7 +160,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
             <Ionicons name="heart-outline" size={20} color="#0F172A" />
           </TouchableOpacity>
         </View>
-      </View>
+      </View> */}
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -265,13 +265,13 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
 
             <View style={styles.metaRow}>
               <Text style={styles.metaLabel}>GST Rate</Text>
-              <Text style={styles.metaValue}>{product.gst_rate ?? "0.00"}%</Text>
+              <Text style={styles.metaValue}>{product.gst_rate ?? "18.00"}%</Text>
             </View>
 
-            <View style={styles.metaRow}>
+            {/* <View style={styles.metaRow}>
               <Text style={styles.metaLabel}>HSN Code</Text>
               <Text style={styles.metaValue}>{product.hsn_code ?? "—"}</Text>
-            </View>
+            </View> */}
 
             <View style={styles.metaRow}>
               <Text style={styles.metaLabel}>Availability</Text>
@@ -282,7 +282,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
           </View>
 
           {/* Trust Row */}
-          <View style={styles.trustRow}>
+          {/* <View style={styles.trustRow}>
             <View style={styles.trustItem}>
               <Ionicons name="shield-checkmark-outline" size={18} color="#0F766E" />
               <Text style={styles.trustText}>Genuine</Text>
@@ -295,12 +295,12 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
               <Ionicons name="call-outline" size={18} color="#0F766E" />
               <Text style={styles.trustText}>Support</Text>
             </View>
-          </View>
+          </View> */}
         </View>
       </ScrollView>
 
       {/* Sticky Bottom CTA */}
-      <View style={styles.bottomBar}>
+      {/* <View style={styles.bottomBar}>
         <View style={{ flex: 1 }}>
           <Text style={styles.bottomPriceLabel}>Total</Text>
           <Text style={styles.bottomPrice}>₹{price.toFixed(2)}</Text>
@@ -318,7 +318,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
           <Ionicons name="cart-outline" size={18} color="#fff" />
           <Text style={styles.ctaText}>{canBuy ? "Add to Cart" : "Out of Stock"}</Text>
         </TouchableOpacity>
-      </View>
+      </View> */}
     </View>
   );
 }
@@ -340,7 +340,7 @@ const styles = StyleSheet.create({
   topBar: {
     position: "absolute",
     zIndex: 50,
-    top: Platform.OS === "android" ? 10 : 55,
+    top: Platform.OS === "android" ? 35 : 55,
     left: 16,
     right: 16,
     flexDirection: "row",
@@ -366,25 +366,29 @@ const styles = StyleSheet.create({
 
   hero: {
     backgroundColor: "#fff",
-    paddingTop: Platform.OS === "android" ? 52 : 92,
+    paddingTop: Platform.OS === "android" ? 62 : 92,
     paddingBottom: 14,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    // borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    // borderBottomRightRadius: 24,
   },
 
   heroImage: {
-    width: "100%",
+    width: "83%",
     height: 320,
     resizeMode: "contain",
     backgroundColor: "#fff",
+    borderRadius: 24,
   },
 
   heroFallback: {
-    width: "100%",
+    width: "83%",
     height: 320,
     backgroundColor: "#E2E8F0",
     alignItems: "center",
     justifyContent: "center",
+    borderRadius: 24,
   },
   heroFallbackText: {
     fontSize: 88,
@@ -397,7 +401,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingHorizontal: 16,
     flexDirection: "row",
-    gap: 10,
+    gap: 20,
   },
 
   badge: {
@@ -411,7 +415,7 @@ const styles = StyleSheet.create({
   badgeText: { fontWeight: "900", fontSize: 12 },
 
   badgeAccent: { backgroundColor: "#DCFCE7" },
-  badgeSuccess: { backgroundColor: "#ECFDF5" },
+  badgeSuccess: { backgroundColor: "#DCFCE7" },
   badgeDanger: { backgroundColor: "#FEE2E2" },
 
   card: {
@@ -440,7 +444,7 @@ const styles = StyleSheet.create({
     borderColor: "#E2E8F0",
   },
 
-  price: { fontSize: 26, fontWeight: "900", color: "#0F766E" },
+  price: { fontSize: 26, fontWeight: "900", color: "#131414" },
   mrp: {
     fontSize: 14,
     fontWeight: "800",
@@ -448,7 +452,7 @@ const styles = StyleSheet.create({
     textDecorationLine: "line-through",
     paddingBottom: 3,
   },
-  saveText: { marginTop: 6, fontWeight: "800", color: "#166534" },
+  saveText: { marginTop: 6, fontWeight: "800", color: "#85c8c6" },
   taxText: { marginTop: 6, fontWeight: "700", color: "#64748B", fontSize: 12 },
 
   pillsRow: { marginTop: 12, flexDirection: "row", gap: 10 },
