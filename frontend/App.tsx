@@ -7,8 +7,24 @@ import { CartProvider } from "./src/context/CartContext";
 import { NavigationContainer } from "@react-navigation/native";
 import { navigationRef } from "./src/navigation/navigationRef";
 import AuthGateModal from "./src/components/AuthGateModal";
+import * as Updates from 'expo-updates';
+import { useEffect } from 'react';
 
 const App = () => {
+
+  // Inside your main App component
+  useEffect(() => {
+    async function updateApp() {
+      if (__DEV__) return; // Don't check in development
+      const update = await Updates.checkForUpdateAsync();
+      if (update.isAvailable) {
+        await Updates.fetchUpdateAsync();
+        await Updates.reloadAsync(); // App restarts with new code
+      }
+    }
+    updateApp();
+  }, []);
+
   return (
     <SafeAreaProvider>
       <NavigationContainer ref={navigationRef}>

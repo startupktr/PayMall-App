@@ -148,7 +148,8 @@ export default function CartScreen() {
       </View>
     );
   }
-
+console.log("Cart-", cart)
+console.log("CartItem-", cart.items)
   return (
     <SafeAreaView style={styles.container}>
       {/* HEADER */}

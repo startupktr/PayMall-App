@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
     height: 164,
     borderRadius: 16,
     resizeMode: "contain",
-    backgroundColor: "#111"
+    backgroundColor: "#fff"
   },
 
   fallback: {

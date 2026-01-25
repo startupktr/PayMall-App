@@ -1,5 +1,5 @@
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status
 from common.responses import success_response, error_response
 from .models import CartItem, Cart
@@ -42,7 +42,7 @@ class CartView(APIView):
 
         return success_response(
             message="Cart fetched successfully",
-            data=CartSerializer(cart).data,
+            data=CartSerializer(cart, context={"request": request}).data,
             status=status.HTTP_200_OK,
         )
 
@@ -107,7 +107,7 @@ class MergeGuestCartView(APIView):
 
         return success_response(
             message="Guest cart merged",
-            data=CartSerializer(cart).data,
+            data=CartSerializer(cart, context={"request": request}).data,
             status=status.HTTP_200_OK,
         )
 
@@ -165,7 +165,7 @@ class AddToCartView(APIView):
 
         return success_response(
             message="Item added to cart",
-            data=CartSerializer(cart).data,
+            data=CartSerializer(cart, context={"request": request}).data,
             status=status.HTTP_200_OK,
         )
 
@@ -205,7 +205,7 @@ class CartItemUpdateView(APIView):
 
             return success_response(
                 message="Item removed from cart",
-                data=CartSerializer(cart).data,
+                data=CartSerializer(cart, context={"request": request}).data,
                 status=status.HTTP_200_OK,
             )
 
@@ -222,7 +222,7 @@ class CartItemUpdateView(APIView):
 
         return success_response(
             message="Cart item updated",
-            data=CartSerializer(cart).data,
+            data=CartSerializer(cart, context={"request": request}).data,
             status=status.HTTP_200_OK,
         )
 
@@ -270,7 +270,7 @@ class RemoveCartItemView(APIView):
 
         return success_response(
             message="Item removed",
-            data=CartSerializer(cart).data,
+            data=CartSerializer(cart, context={"request": request}).data,
             status=status.HTTP_200_OK,
         )
 
