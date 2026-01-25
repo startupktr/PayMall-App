@@ -5,7 +5,7 @@ import { useCart } from "@/context/CartContext";
 import { postLoginRedirect } from "@/lib/postLoginRedirect";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { STORAGE_KEYS } from "@/utils/storageKeys";
-import { navigationRef } from "@/navigation/navigationRef";
+import { safeNavigate, waitForNavigationReady } from "@/navigation/navigationRef";
 
 type AuthContextType = {
   user: any;
@@ -32,23 +32,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     restoreSession();
   }, []);
-  
+
 
   const routeAfterAuth = async () => {
     try {
       const seen = await AsyncStorage.getItem(STORAGE_KEYS.ONBOARDING_SEEN);
+      const target = seen !== "true" ? "Onboarding" : "Main";
 
-      // ✅ First time login → show onboarding
-      if (seen !== "true") {
-        navigationRef.current?.navigate("Onboarding");
-        return;
-      }
-
-      // ✅ already seen → go to Main (Home)
-      navigationRef.current?.navigate("Main");
+      await waitForNavigationReady(2000);
+      safeNavigate(target);
     } catch {
-      // fallback
-      navigationRef.current?.navigate("Main");
+      await waitForNavigationReady(2000);
+      safeNavigate("Main");
     }
   };
 

@@ -1,3 +1,4 @@
 export const STORAGE_KEYS = {
-  ONBOARDING_SEEN: "ONBOARDING_SEEN",
+  APP_ONBOARDING_DONE: "APP_ONBOARDING_DONE", // ✅ show onboarding only once per install
 };
+

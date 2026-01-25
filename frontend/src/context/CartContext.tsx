@@ -176,7 +176,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         params: { mall_id: mallId },
         _silentAuth: true,
       })) as ApiEnvelope<Cart>;
-      console.log("res:-", res)
+      
       setCartFromEnvelope(res);
     } catch {
       setCart(null);

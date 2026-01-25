@@ -47,7 +47,7 @@ export default function OnboardingScreen() {
   );
 
   const complete = async () => {
-    await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING_SEEN, "true");
+    await AsyncStorage.setItem(STORAGE_KEYS.APP_ONBOARDING_DONE, "true");
 
     navigationRef.current?.reset({
       index: 0,
