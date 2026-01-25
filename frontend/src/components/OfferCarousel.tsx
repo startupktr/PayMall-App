@@ -1,97 +1,197 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   View,
   FlatList,
   StyleSheet,
-  Dimensions,
   TouchableOpacity,
   Image,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  useWindowDimensions,
 } from "react-native";
 import { Offer } from "@/types/offer";
 
-const { width } = Dimensions.get("window");
-
 type Props = {
   offers: Offer[];
-  onPress: (mallId: number) => void;
+  onPress: (mallId: any) => void; // keep flexible (uuid/number)
 };
 
 export default function OfferCarousel({ offers, onPress }: Props) {
   const flatListRef = useRef<FlatList>(null);
 
-  /**
-   * ✅ To make infinite loop seamless:
-   * We create a list like: [last, ...original, first]
-   * Then start at index 1.
-   */
+  // ✅ responsive width
+  const { width: SCREEN_WIDTH } = useWindowDimensions();
+
+  // ✅ This carousel is rendered inside a parent with paddingHorizontal:16
+  // We want banner to look perfect + centered (NOT shifted)
+  const SIDE_GAP = 16; // same as HomeScreen padding
+
+  // ✅ Full width carousel slide
+  const slideWidth = SCREEN_WIDTH;
+
+  // ✅ Banner visible area inside slide (with same 16px margin)
+  const bannerWidth = slideWidth - SIDE_GAP * 2;
+
+  // ✅ 1280×640 => 2:1
+  const bannerHeight = Math.round(bannerWidth / 2);
+
+  // ✅ infinite loop data
   const loopData = useMemo(() => {
     if (offers.length <= 1) return offers;
     return [offers[offers.length - 1], ...offers, offers[0]];
   }, [offers]);
 
+  // ✅ index in loopData space
   const [index, setIndex] = useState(offers.length > 1 ? 1 : 0);
 
-  // ✅ Autoplay
+  // ✅ autoplay
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isDraggingRef = useRef(false);
+  const isListReadyRef = useRef(false);
+
+  // ✅ preload + fallback
+  const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({});
+
+  /* ================= IMAGE PRELOAD ================= */
   useEffect(() => {
+    let cancelled = false;
+
+    const preload = async () => {
+      try {
+        const urls = offers
+          .map((o) => o.image)
+          .filter(Boolean)
+          .slice(0, 10);
+
+        await Promise.all(
+          urls.map((uri) => {
+            return new Promise<void>((resolve) => {
+              Image.prefetch(uri)
+                .then(() => resolve())
+                .catch(() => resolve());
+            });
+          })
+        );
+
+        if (!cancelled) {
+          setLoadedImages((prev) => {
+            const next = { ...prev };
+            urls.forEach((u) => (next[u] = true));
+            return next;
+          });
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    preload();
+    return () => {
+      cancelled = true;
+    };
+  }, [offers]);
+
+  /* ================= AUTOPLAY HELPERS ================= */
+
+  const clearAutoPlay = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const safeScrollToIndex = useCallback(
+    (targetIndex: number, animated: boolean) => {
+      if (!flatListRef.current) return;
+      if (!isListReadyRef.current) return;
+
+      try {
+        flatListRef.current.scrollToIndex({
+          index: targetIndex,
+          animated,
+        });
+      } catch {
+        // ignore
+      }
+    },
+    []
+  );
+
+  const startAutoPlay = useCallback(() => {
     if (offers.length <= 1) return;
 
-    const timer = setInterval(() => {
-      flatListRef.current?.scrollToIndex({
-        index: index + 1,
-        animated: true,
-      });
+    clearAutoPlay();
+
+    timerRef.current = setInterval(() => {
+      if (isDraggingRef.current) return;
+
+      safeScrollToIndex(index + 1, true);
       setIndex((prev) => prev + 1);
     }, 3500);
+  }, [offers.length, clearAutoPlay, safeScrollToIndex, index]);
 
-    return () => clearInterval(timer);
-  }, [index, offers.length]);
+  useEffect(() => {
+    startAutoPlay();
+    return () => clearAutoPlay();
+  }, [startAutoPlay, clearAutoPlay]);
 
-  // ✅ initial position = 1
+  /* ================= RESET WHEN OFFERS CHANGE ================= */
+
   useEffect(() => {
     if (offers.length > 1) {
-      setTimeout(() => {
-        flatListRef.current?.scrollToIndex({ index: 1, animated: false });
-      }, 10);
+      setIndex(1);
+      setTimeout(() => safeScrollToIndex(1, false), 50);
+    } else {
+      setIndex(0);
     }
-  }, [offers.length]);
+  }, [offers.length, safeScrollToIndex]);
 
-  // ✅ On scroll end: handle seamless loop jump
+  /* ================= LOOP JUMP ================= */
+
   const onMomentumEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (offers.length <= 1) return;
 
-    const currentIndex = Math.round(e.nativeEvent.contentOffset.x / width);
+    const currentIndex = Math.round(e.nativeEvent.contentOffset.x / slideWidth);
     setIndex(currentIndex);
 
-    // If we reached fake last (which is original first)
+    // fake last -> jump to real first
     if (currentIndex === loopData.length - 1) {
-      // jump to real first (index=1) without animation
       setTimeout(() => {
-        flatListRef.current?.scrollToIndex({ index: 1, animated: false });
+        safeScrollToIndex(1, false);
         setIndex(1);
-      }, 10);
+      }, 30);
     }
 
-    // If we reached fake first (which is original last)
+    // fake first -> jump to real last
     if (currentIndex === 0) {
-      // jump to real last (index=offers.length) without animation
       setTimeout(() => {
-        flatListRef.current?.scrollToIndex({
-          index: offers.length,
-          animated: false,
-        });
+        safeScrollToIndex(offers.length, false);
         setIndex(offers.length);
-      }, 10);
+      }, 30);
     }
   };
 
-  /**
-   * ✅ Pagination dot index should map to ORIGINAL offers
-   * realIndex = (index - 1) for looped data
-   */
+  /* ================= DOTS ================= */
+
   const activeDotIndex =
     offers.length <= 1 ? 0 : (index - 1 + offers.length) % offers.length;
+
+  const onDotPress = (dotIndex: number) => {
+    if (offers.length <= 1) return;
+
+    const targetLoopIndex = dotIndex + 1;
+
+    isDraggingRef.current = true;
+    clearAutoPlay();
+
+    safeScrollToIndex(targetLoopIndex, true);
+    setIndex(targetLoopIndex);
+
+    setTimeout(() => {
+      isDraggingRef.current = false;
+      startAutoPlay();
+    }, 800);
+  };
 
   return (
     <View>
@@ -100,37 +200,91 @@ export default function OfferCarousel({ offers, onPress }: Props) {
         data={loopData}
         horizontal
         pagingEnabled
-        snapToInterval={width}           // ✅ snap properly
-        decelerationRate="fast"          // ✅ iOS smooth
-        snapToAlignment="start"          // ✅ no mid-stuck
+
+        // ✅ smooth snap
+        snapToInterval={slideWidth}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        disableIntervalMomentum
+
         showsHorizontalScrollIndicator={false}
         keyExtractor={(_, i) => `offer-${i}`}
         onMomentumScrollEnd={onMomentumEnd}
         getItemLayout={(_, i) => ({
-          length: width,
-          offset: width * i,
+          length: slideWidth,
+          offset: slideWidth * i,
           index: i,
         })}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={() => onPress(item.mall_id)}
-            style={styles.bannerWrap}
-          >
-            <Image source={{ uri: item.image }} style={styles.bannerImage} />
-          </TouchableOpacity>
-        )}
+
+        onScrollBeginDrag={() => {
+          isDraggingRef.current = true;
+          clearAutoPlay();
+        }}
+        onScrollEndDrag={() => {
+          setTimeout(() => {
+            isDraggingRef.current = false;
+            startAutoPlay();
+          }, 800);
+        }}
+
+        onLayout={() => {
+          isListReadyRef.current = true;
+        }}
+
+        onScrollToIndexFailed={(info) => {
+          setTimeout(() => {
+            safeScrollToIndex(info.index, false);
+          }, 50);
+        }}
+
+        renderItem={({ item }) => {
+          const uri = item.image;
+          const isLoaded = !!loadedImages[uri];
+
+          return (
+            <View style={[styles.slide, { width: slideWidth }]}>
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => onPress(item.mall_id)}
+                style={[
+                  styles.bannerWrap,
+                  {
+                    width: bannerWidth,
+                    height: bannerHeight,
+                    marginHorizontal: SIDE_GAP, // ✅ PERFECT alignment
+                  },
+                ]}
+              >
+                {!isLoaded && <View style={styles.fallback} />}
+
+                <Image
+                  source={{ uri }}
+                  style={StyleSheet.absoluteFillObject}
+                  resizeMode="cover"
+                  onLoadEnd={() => {
+                    setLoadedImages((prev) => ({ ...prev, [uri]: true }));
+                  }}
+                />
+              </TouchableOpacity>
+            </View>
+          );
+        }}
       />
 
-      {/* Pagination dots */}
+      {/* ✅ Clickable dots */}
       {offers.length > 1 && (
         <View style={styles.dots}>
-          {offers.map((_, i) => (
-            <View
-              key={i}
-              style={[styles.dot, i === activeDotIndex && styles.activeDot]}
-            />
-          ))}
+          {offers.map((_, i) => {
+            const isActive = i === activeDotIndex;
+            return (
+              <TouchableOpacity
+                key={i}
+                activeOpacity={0.8}
+                onPress={() => onDotPress(i)}
+                style={[styles.dot, isActive && styles.activeDot]}
+              />
+            );
+          })}
         </View>
       )}
     </View>
@@ -138,32 +292,19 @@ export default function OfferCarousel({ offers, onPress }: Props) {
 }
 
 const styles = StyleSheet.create({
-  bannerWrap: {
-    width,
-    alignItems: "center",
+  slide: {
     justifyContent: "center",
-    // paddingHorizontal: 1,
-    left: -15
   },
 
-  bannerImage: {
-    width: "91%",
-    height: 164,
+  bannerWrap: {
     borderRadius: 16,
-    resizeMode: "contain",
-    backgroundColor: "#fff"
+    overflow: "hidden",
+    backgroundColor: "#fff",
   },
 
   fallback: {
-    width: "91%",
-    height: 164,
-    borderRadius: 16,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: "#E2E8F0",
-    overflow: "hidden",
-  },
-
-  fallbackBox: {
-    flex: 1,
   },
 
   dots: {

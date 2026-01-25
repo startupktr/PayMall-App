@@ -170,9 +170,18 @@ export default function MallDetailsScreen({ route, navigation }: any) {
         <Text style={styles.mallSub}>{mall?.address}</Text>
       </View>
 
-      {offers.length > 0 && <OfferCarousel offers={offers} onPress={() => {}} />}
+      {/* {offers.length > 0 && <OfferCarousel offers={offers} onPress={() => { }} />} */}
 
+      {offers.length > 0 && (
+        <View style={{ marginHorizontal: -16, paddingTop: 10 }}>
+          <OfferCarousel
+            offers={offers}
+            onPress={() => {}}
+          />
+        </View>
+      )}
       <View style={styles.stickyBar}>
+
         <FlatList
           horizontal
           data={categories}
@@ -352,7 +361,7 @@ const styles = StyleSheet.create({
   },
   sortText: { color: "#0F766E", fontWeight: "800" },
 
-  list: { padding: 16, paddingBottom: 140 },
+  list: { padding: 16, paddingBottom: 14 },
 
   card: {
     width: "48%",
