@@ -5,16 +5,24 @@ from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# ===============================
+# ENV DETECTION (ADD ONLY)
+# ===============================
+ENV = os.getenv("ENV", "production")
+IS_PRODUCTION = ENV == "production"
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY')
+# ===============================
+# SECURITY
+# ===============================
+SECRET_KEY = os.getenv("SECRET_KEY")
+DEBUG = os.getenv("DEBUG", "False") == "True"
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'False') == 'True'
-
+# ===============================
+# ALLOWED HOSTS (ADD DEV IP SUPPORT)
+# ===============================
 ALLOWED_HOSTS = [
     "api.paymall.live",
     "paymall.live",
@@ -24,8 +32,18 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
 ]
 
-# Application definition
+# ===============================
+# DEV-ONLY HOST ALLOW (SAFE)
+# ===============================
+if os.getenv("ENV") == "development":
+    ALLOWED_HOSTS += [
+        "192.168.0.165",   # your PC LAN IP
+        "0.0.0.0",
+    ]
 
+# ===============================
+# APPLICATIONS
+# ===============================
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -33,9 +51,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
+
     'accounts',
     'malls',
     'products',
@@ -44,6 +64,9 @@ INSTALLED_APPS = [
     'payments',
 ]
 
+# ===============================
+# MIDDLEWARE
+# ===============================
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
@@ -74,10 +97,9 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'PayMall.wsgi.application'
 
-
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
+# ===============================
+# DATABASE
+# ===============================
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -85,63 +107,14 @@ DATABASES = {
     }
 }
 
-
-# Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
-
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
-]
-
-
-# Internationalization
-# https://docs.djangoproject.com/en/5.2/topics/i18n/
-
-LANGUAGE_CODE = 'en-us'
-
-TIME_ZONE = 'UTC'
-
-USE_I18N = True
-
-USE_TZ = True
-
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
-
-STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'static')
-
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
-
-AUTHENTICATION_BACKENDS = [
-    "django.contrib.auth.backends.ModelBackend",
-]
-
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
+# ===============================
+# AUTH / REST
+# ===============================
+AUTH_USER_MODEL = 'accounts.User'
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        # 1️⃣ Mobile apps (React Native, Postman)
         "rest_framework_simplejwt.authentication.JWTAuthentication",
-
-        # 2️⃣ Web admin (React + HttpOnly cookies)
         "accounts.authentication.CookieJWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
@@ -149,41 +122,36 @@ REST_FRAMEWORK = {
     ),
 }
 
-# Simple JWT settings
-from datetime import timedelta
-
+# ===============================
+# JWT (UNCHANGED FOR PROD)
+# ===============================
 SIMPLE_JWT = {
-    # Token lifetimes
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
 
-    # Rotation & blacklist
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
 
-    # Signing
     "ALGORITHM": "HS256",
     "SIGNING_KEY": SECRET_KEY,
 
-    # 🔥 COOKIE SETTINGS (THIS FIXES YOUR ERROR)
     "AUTH_COOKIE": "access_token",
     "AUTH_COOKIE_REFRESH": "refresh_token",
 
-    "AUTH_COOKIE_SECURE": True,  # True in production (HTTPS)
+    # 🔒 PROD SAFE (UNCHANGED)
+    "AUTH_COOKIE_SECURE": True,
     "AUTH_COOKIE_HTTP_ONLY": True,
     "AUTH_COOKIE_PATH": "/",
-    "AUTH_COOKIE_SAMESITE": "None",  # "None" + Secure=True for cross-domain
+    "AUTH_COOKIE_SAMESITE": "None",
 }
 
-
-# Custom user model
-AUTH_USER_MODEL = 'accounts.User'
-
+# ===============================
+# CORS (PROD UNCHANGED)
+# ===============================
 CORS_ALLOWED_ORIGINS = [
     "https://paymall.live",
     "https://www.paymall.live",
     "https://merchant.paymall.live",
-
     "http://localhost:8080",
     "http://127.0.0.1:8080",
 ]
@@ -195,32 +163,45 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^null$",
 ]
 
-
+# ===============================
+# CSRF (PROD UNCHANGED)
+# ===============================
 CSRF_TRUSTED_ORIGINS = [
     "https://paymall.live",
     "https://www.paymall.live",
     "https://merchant.paymall.live",
     "https://api.paymall.live",
-
-    # local dev
     "http://localhost:8080",
     "http://127.0.0.1:8080",
 ]
+
 CSRF_COOKIE_SECURE = True
 CSRF_COOKIE_SAMESITE = "None"
 
-CORS_ALLOW_HEADERS = [
-    "accept",
-    "accept-encoding",
-    "authorization",
-    "content-type",
-    "dnt",
-    "origin",
-    "user-agent",
-    "x-csrftoken",
-    "x-requested-with",
-]
+# ===============================
+# DEV-ONLY OVERRIDES (SAFE)
+# ===============================
+if not IS_PRODUCTION:
+    # 🔓 allow Expo / mobile / LAN
+    CORS_ALLOW_ALL_ORIGINS = True
 
-CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    # 🔓 allow HTTP cookies in dev
+    CSRF_COOKIE_SECURE = False
+    SESSION_COOKIE_SECURE = False
+
+    # 🔓 allow JWT cookies over HTTP
+    SIMPLE_JWT["AUTH_COOKIE_SECURE"] = False
+    SIMPLE_JWT["AUTH_COOKIE_SAMESITE"] = "Lax"
+
+# ===============================
+# STATIC / MEDIA
+# ===============================
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

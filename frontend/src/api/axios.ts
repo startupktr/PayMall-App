@@ -2,9 +2,25 @@ import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 import { authEvents } from "@/lib/authEvents";
 import { pendingRequest } from "@/lib/pendingRequest";
+import Constants from "expo-constants";
 
-const URL = "https://api.paymall.live";
-// const URL = "http://127.0.0.1:8000"
+// const URL = "https://api.paymall.live";
+// // const URL = "http://127.0.0.1:8000"
+
+/* =============================
+   API BASE URL (ENV SAFE)
+============================= */
+
+const { apiUrl, env } = Constants.expoConfig?.extra || {};
+
+if (!apiUrl) {
+  throw new Error("❌ API_URL is not defined in app.config.ts");
+}
+
+if (__DEV__) {
+  console.log("🌍 ENV:", env);
+  console.log("🌍 API_URL:", apiUrl);
+}
 
 const api: any = axios.create({
   baseURL: `${URL}/api/`,

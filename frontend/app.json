@@ -45,17 +45,13 @@
       ],
       "expo-video"
     ],
-    "extra": {
-      "eas": {
-        "projectId": "4d42c8cf-602a-439d-8d2d-28afc2059293"
-      }
-    },
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "updates": {
-      "url": "https://u.expo.dev/4d42c8cf-602a-439d-8d2d-28afc2059293"
-    },
-    "owner": "startupktr"
+    "extra": {
+      "eas": {
+        "projectId": "f7e44fc2-0f67-40df-b67a-dad486f47941"
+      }
+    }
   }
 }

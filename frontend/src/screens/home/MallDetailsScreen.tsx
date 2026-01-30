@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
-  Alert,
+  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import HomeHeader from "@/components/HomeHeader";
@@ -35,6 +35,7 @@ type Category = {
   id: number;
   name: string;
   slug: string;
+  image?: string | null; // ✅ category image
 };
 
 const SORT_OPTIONS = [
@@ -49,7 +50,7 @@ export default function MallDetailsScreen({ route, navigation }: any) {
   const { mallId } = route.params;
 
   const { setSelectedMall } = useMall();
-  const { fetchCart, cart, isGuest } = useCart();
+  const { fetchCart, cart } = useCart();
 
   /* ---------- DATA ---------- */
   const [products, setProducts] = useState<Product[]>([]);
@@ -64,6 +65,25 @@ export default function MallDetailsScreen({ route, navigation }: any) {
   const [sortOpen, setSortOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [mall, setMall] = useState<any>(null);
+
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+
+  // ✅ category auto-scroll
+  const categoryListRef = useRef<FlatList<Category> | null>(null);
+
+  // ✅ cache products per (mall + category + sort)
+  const productsCacheRef = useRef<Record<string, Product[]>>({});
+
+  /* ================= RESPONSIVE ================= */
+
+  const { width } = Dimensions.get("window");
+
+  const productColumns = useMemo(() => {
+    if (width >= 900) return 4;
+    if (width >= 768) return 3;
+    return 2;
+  }, [width]);
 
   /* ================= INITIAL LOAD ================= */
 
@@ -83,7 +103,6 @@ export default function MallDetailsScreen({ route, navigation }: any) {
       name: mall.name,
     });
 
-    // ✅ refresh cart for this mall (guest/local OR backend)
     fetchCart();
   }, [mall]);
 
@@ -95,54 +114,61 @@ export default function MallDetailsScreen({ route, navigation }: any) {
   };
 
   const fetchCategories = async () => {
-    const res = await api.get("products/categories/", {
-      params: { mall: mallId },
-    });
+    try {
+      setLoadingCategories(true);
 
-    setCategories([{ id: -1, name: "All", slug: "__all__" }, ...(res.data || [])]);
+      const res = await api.get("products/categories/", {
+        params: { mall: mallId },
+      });
+
+      setCategories([
+        { id: -1, name: "All", slug: "__all__", image: null },
+        ...(res.data || []),
+      ]);
+    } finally {
+      setLoadingCategories(false);
+    }
   };
 
   const fetchMallOffers = async () => {
-    const res = await api.get("malls/offers/", {
-      params: { mall: mallId },
-    });
+    const res = await api.get("malls/offers/", { params: { mall: mallId } });
     setOffers(res.data || []);
   };
 
   const fetchProducts = async (category: string, sortBy: string) => {
-    const res = await api.get("products/list/", {
-      params: {
-        mall: mallId,
-        category: category !== "__all__" ? category : undefined,
-        sort: sortBy,
-      },
-    });
+    const cacheKey = `${mallId}__${category}__${sortBy}`;
 
-    setProducts(res.data || []);
-    setFilteredProducts(res.data || []);
+    // ✅ cache hit = instant (no re-fetch)
+    if (productsCacheRef.current[cacheKey]) {
+      setProducts(productsCacheRef.current[cacheKey]);
+      setFilteredProducts(productsCacheRef.current[cacheKey]);
+      return;
+    }
+
+    try {
+      setLoadingProducts(true);
+
+      const res = await api.get("products/list/", {
+        params: {
+          mall: mallId,
+          category: category !== "__all__" ? category : undefined,
+          sort: sortBy,
+        },
+      });
+
+      const list: Product[] = res.data || [];
+
+      // ✅ save cache
+      productsCacheRef.current[cacheKey] = list;
+
+      setProducts(list);
+      setFilteredProducts(list);
+    } finally {
+      setLoadingProducts(false);
+    }
   };
 
-  /* ================= USER ACTION HANDLERS ================= */
-
-  const onCategoryChange = (slug: string) => {
-    setSelectedCategory(slug);
-    fetchProducts(slug, sort);
-  };
-
-  const onSortChange = (value: string) => {
-    setSort(value);
-    fetchProducts(selectedCategory, value);
-  };
-
-  /* ================= REFRESH ================= */
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchProducts(selectedCategory, sort);
-    setRefreshing(false);
-  };
-
-  /* ================= LOCAL SEARCH ================= */
+  /* ================= SEARCH FILTER ================= */
 
   useEffect(() => {
     if (!search.trim()) {
@@ -154,65 +180,195 @@ export default function MallDetailsScreen({ route, navigation }: any) {
     setFilteredProducts(products.filter((p) => p.name.toLowerCase().includes(q)));
   }, [search, products]);
 
-  /* ================= CART HELPERS ================= */
+  /* ================= HELPERS ================= */
 
   const getQtyInCart = (productId: number) => {
-    return cart?.items?.find((x) => x.product.id === productId)?.quantity || 0;
+    return cart?.items?.find((x: any) => x.product.id === productId)?.quantity || 0;
   };
 
-  /* ================= HEADER ================= */
+  /* ================= HANDLERS ================= */
 
-  const renderHeader = () => (
-    <>
-      <View style={styles.mallHero}>
-        <Text style={styles.mallTitle}>Welcome to {mall?.name ?? ""}</Text>
-        <Text style={styles.mallSub}>{mall?.description}</Text>
-        <Text style={styles.mallSub}>{mall?.address}</Text>
-      </View>
+  const onCategoryChange = (slug: string, index: number) => {
+    setSelectedCategory(slug);
+    fetchProducts(slug, sort);
 
-      {/* {offers.length > 0 && <OfferCarousel offers={offers} onPress={() => { }} />} */}
+    // ✅ auto scroll category bar to selected
+    requestAnimationFrame(() => {
+      categoryListRef.current?.scrollToIndex({
+        index: Math.max(index - 1, 0),
+        animated: true,
+        viewPosition: 0.2,
+      });
+    });
+  };
 
-      {offers.length > 0 && (
-        <View style={{ marginHorizontal: -16, paddingTop: 10 }}>
-          <OfferCarousel
-            offers={offers}
-            onPress={() => {}}
-          />
+  const onSortChange = (value: string) => {
+    setSort(value);
+    fetchProducts(selectedCategory, value);
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+
+    // ✅ clear only current category cache and refetch
+    const cacheKey = `${mallId}__${selectedCategory}__${sort}`;
+    delete productsCacheRef.current[cacheKey];
+
+    await fetchProducts(selectedCategory, sort);
+    setRefreshing(false);
+  };
+
+  /* ================= HEADER (stable + premium categories) ================= */
+
+  const headerComponent = useMemo(() => {
+    return (
+      <>
+        {/* Small mall name */}
+        <View style={styles.mallHero}>
+          <Text style={styles.mallTitle}>{mall?.name ?? "Mall"}</Text>
         </View>
-      )}
-      <View style={styles.stickyBar}>
 
-        <FlatList
-          horizontal
-          data={categories}
-          keyExtractor={(i) => i.slug}
-          showsHorizontalScrollIndicator={false}
-          renderItem={({ item }) => (
+        {/* Offers */}
+        {offers.length > 0 && (
+          <View style={{ marginHorizontal: -16, paddingTop: 6 }}>
+            <OfferCarousel offers={offers} onPress={() => {}} />
+          </View>
+        )}
+
+        {/* Premium Category Bar */}
+        <View style={styles.categoryBar}>
+          <View style={styles.categoryRowHeader}>
+            <Text style={styles.categoryHeading}>Categories</Text>
+
             <TouchableOpacity
-              style={[styles.chip, selectedCategory === item.slug && styles.chipActive]}
-              onPress={() => onCategoryChange(item.slug)}
+              activeOpacity={0.9}
+              style={styles.sortBtn}
+              onPress={() => setSortOpen(true)}
             >
-              <Text
-                style={[
-                  styles.chipText,
-                  selectedCategory === item.slug && styles.chipTextActive,
-                ]}
-              >
-                {item.name}
+              <Ionicons name="swap-vertical" size={16} color="#0F766E" />
+              <Text style={styles.sortText} numberOfLines={1}>
+                {SORT_OPTIONS.find((s) => s.value === sort)?.label}
               </Text>
             </TouchableOpacity>
-          )}
-        />
+          </View>
 
-        <TouchableOpacity style={styles.sortBtn} onPress={() => setSortOpen(true)}>
-          <Ionicons name="swap-vertical" size={16} color="#0F766E" />
-          <Text style={styles.sortText}>
-            {SORT_OPTIONS.find((s) => s.value === sort)?.label}
+          {loadingCategories ? (
+            <Text style={{ color: "#64748B", fontWeight: "800" }}>
+              Loading categories…
+            </Text>
+          ) : (
+            <FlatList
+              ref={(ref) => {
+                categoryListRef.current = ref;
+              }}
+              horizontal
+              data={categories}
+              keyExtractor={(i) => i.slug}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingRight: 10 }}
+              getItemLayout={(_, index) => ({
+                length: 76,
+                offset: 76 * index,
+                index,
+              })}
+              renderItem={({ item, index }) => {
+                const active = selectedCategory === item.slug;
+
+                return (
+                  <TouchableOpacity
+                    activeOpacity={0.92}
+                    style={[styles.categoryChip, active && styles.categoryChipActive]}
+                    onPress={() => onCategoryChange(item.slug, index)}
+                  >
+                    <View style={styles.categoryIconWrap}>
+                      {item.image ? (
+                        <Image source={{ uri: item.image }} style={styles.categoryIcon} />
+                      ) : (
+                        <Text
+                          style={[
+                            styles.categoryIconFallback,
+                            active && { color: "#0F766E" },
+                          ]}
+                        >
+                          {item.name?.trim()?.[0]?.toUpperCase() ?? "?"}
+                        </Text>
+                      )}
+                    </View>
+
+                    <Text
+                      style={[
+                        styles.categoryChipText,
+                        active && styles.categoryChipTextActive,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {item.name}
+                    </Text>
+
+                    {/* ✅ bottom underline bar */}
+                    <View
+                      style={[
+                        styles.categoryUnderline,
+                        active && styles.categoryUnderlineActive,
+                      ]}
+                    />
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          )}
+        </View>
+      </>
+    );
+  }, [mall?.name, offers, categories, selectedCategory, sort, loadingCategories]);
+
+  /* ================= PRODUCT CARD (small, dense) ================= */
+
+  const renderProductCard = ({ item }: { item: Product }) => {
+    const qty = getQtyInCart(item.id);
+
+    return (
+      <View style={styles.card}>
+        <TouchableOpacity
+          activeOpacity={0.88}
+          onPress={() =>
+            navigation.navigate("MallProductDetails", {
+              productId: item.id,
+              mallId: mallId,
+            })
+          }
+        >
+          <View style={styles.imageWrap}>
+            {item.image ? (
+              <Image source={{ uri: item.image }} style={styles.image} />
+            ) : (
+              <View style={styles.placeholder}>
+                <Text style={styles.placeholderText}>{item.name?.[0] || "P"}</Text>
+              </View>
+            )}
+          </View>
+
+          <Text style={styles.name} numberOfLines={2}>
+            {item.name}
           </Text>
+
+          <View style={styles.priceRow}>
+            <Text style={styles.price}>₹{Number(item.price).toFixed(0)}</Text>
+            {item.marked_price > item.price ? (
+              <Text style={styles.mrp}>₹{Number(item.marked_price).toFixed(0)}</Text>
+            ) : null}
+          </View>
+
+          {qty > 0 ? (
+            <View style={styles.qtyTag}>
+              <Ionicons name="cart-outline" size={14} color="#0F766E" />
+              <Text style={styles.qtyTagText}>{qty}</Text>
+            </View>
+          ) : null}
         </TouchableOpacity>
       </View>
-    </>
-  );
+    );
+  };
 
   /* ================= RENDER ================= */
 
@@ -242,51 +398,23 @@ export default function MallDetailsScreen({ route, navigation }: any) {
 
         <FlatList
           data={filteredProducts}
-          numColumns={2}
+          numColumns={productColumns}
+          key={`cols-${productColumns}`}
           keyExtractor={(i) => `product-${i.id}`}
-          columnWrapperStyle={{ justifyContent: "space-between" }}
           contentContainerStyle={styles.list}
-          ListHeaderComponent={renderHeader}
+          columnWrapperStyle={productColumns > 1 ? styles.columnWrap : undefined}
+          ListHeaderComponent={headerComponent}
           keyboardShouldPersistTaps="handled"
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          renderItem={({ item }) => {
-            const qty = getQtyInCart(item.id);
-
-            return (
-              <View style={styles.card}>
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={() =>
-                    navigation.navigate("MallProductDetails", {
-                      productId: item.id,
-                      mallId: mallId,
-                    })
-                  }
-                >
-                  {item.image ? (
-                    <Image source={{ uri: item.image }} style={styles.image} />
-                  ) : (
-                    <View style={styles.placeholder}>
-                      <Text style={styles.placeholderText}>{item.name?.[0] || "P"}</Text>
-                    </View>
-                  )}
-
-                  <Text style={styles.name} numberOfLines={2}>
-                    {item.name}
-                  </Text>
-
-                  <Text style={styles.price}>₹{item.price}</Text>
-                  {item.marked_price > item.price && <Text style={styles.mrp}>₹{Number(item.marked_price).toFixed(2)}</Text>}
-                </TouchableOpacity>
-
-                {/* <TouchableOpacity style={styles.addBtn} onPress={() => handleAdd(item)}>
-                  <Text style={styles.addText}>{qty > 0 ? `Add (+${qty})` : "Add"}</Text>
-                  <Ionicons name="add" size={16} color="#fff" />
-                </TouchableOpacity> */}
-              </View>
-            );
-          }}
-          ListEmptyComponent={<Text style={styles.empty}>No products found</Text>}
+          renderItem={renderProductCard}
+          ListEmptyComponent={
+            loadingProducts ? (
+              <Text style={styles.empty}>Loading products...</Text>
+            ) : (
+              <Text style={styles.empty}>No products found</Text>
+            )
+          }
+          showsVerticalScrollIndicator={false}
         />
 
         {/* SORT MODAL */}
@@ -318,98 +446,201 @@ export default function MallDetailsScreen({ route, navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F1F5F9" },
 
-  mallHero: { padding: 16 },
-  mallTitle: { fontSize: 20, fontWeight: "900", color: "#0F172A" },
-  mallSub: { fontSize: 13, color: "#64748B", marginTop: 4 },
+  mallHero: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 },
+  mallTitle: { fontSize: 18, fontWeight: "900", color: "#0F172A" },
 
-  guestBanner: {
-    marginTop: 12,
-    backgroundColor: "#ECFEFF",
-    borderWidth: 1,
-    borderColor: "#A5F3FC",
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  guestText: { color: "#0F766E", fontWeight: "800", fontSize: 12 },
+  list: { padding: 16, paddingBottom: 14 },
+  columnWrap: { justifyContent: "space-between" },
 
-  stickyBar: {
-    padding: 12,
+  /* Category Bar */
+  categoryBar: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     borderColor: "#E2E8F0",
   },
 
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: "#E2E8F0",
-    borderRadius: 999,
-    marginRight: 8,
+  categoryRowHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
   },
-  chipActive: { backgroundColor: "#0F766E" },
-  chipText: { fontWeight: "700", color: "#0F172A" },
-  chipTextActive: { color: "#fff" },
+
+  categoryHeading: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  categoryChip: {
+    width: 72,
+    marginRight: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+    alignItems: "center",
+    borderRadius: 14,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  categoryChipActive: {
+    borderColor: "#0F766E",
+    backgroundColor: "#ECFEFF",
+  },
+
+  categoryIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: "#F1F5F9",
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  categoryIcon: { width: "100%", height: "100%", resizeMode: "cover" },
+
+  categoryIconFallback: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  categoryChipText: {
+    marginTop: 6,
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#64748B",
+  },
+
+  categoryChipTextActive: {
+    color: "#0F766E",
+  },
+
+  categoryUnderline: {
+    marginTop: 6,
+    height: 3,
+    width: "80%",
+    borderRadius: 999,
+    backgroundColor: "transparent",
+  },
+
+  categoryUnderlineActive: {
+    backgroundColor: "#0F766E",
+  },
 
   sortBtn: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 10,
     gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: "#ECFEFF",
+    borderWidth: 1,
+    borderColor: "#99F6E4",
   },
-  sortText: { color: "#0F766E", fontWeight: "800" },
+  sortText: { color: "#0F766E", fontWeight: "800", fontSize: 12, maxWidth: 130 },
 
-  list: { padding: 16, paddingBottom: 14 },
-
+  /* Small Product Cards */
   card: {
     width: "48%",
     backgroundColor: "#E6F4F1",
-    borderRadius: 18,
-    padding: 12,
-    marginBottom: 14,
+    borderRadius: 16,
+    padding: 10,
+    marginBottom: 12,
     shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 2,
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 1,
   },
 
-  image: { width: "100%", height: 110, borderRadius: 14 },
+  imageWrap: {
+    width: "100%",
+    height: 92,
+    borderRadius: 12,
+    backgroundColor: "#fff",
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  image: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "contain",
+  },
 
   placeholder: {
-    height: 110,
-    borderRadius: 14,
+    width: "100%",
+    height: "100%",
     backgroundColor: "#CBD5E1",
     justifyContent: "center",
     alignItems: "center",
   },
-  placeholderText: { fontSize: 32, fontWeight: "900", color: "#0F172A" },
 
-  name: { fontWeight: "800", marginTop: 8, color: "#0F172A", minHeight: 20 },
-  price: { color: "#0F766E", fontWeight: "900" },
+  placeholderText: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  name: {
+    fontWeight: "800",
+    marginTop: 6,
+    color: "#0F172A",
+    fontSize: 12,
+    minHeight: 34,
+  },
+
+  priceRow: {
+    marginTop: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  price: {
+    color: "#0F766E",
+    fontWeight: "900",
+    fontSize: 13,
+  },
+
   mrp: {
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: "800",
     color: "#94A3B8",
     textDecorationLine: "line-through",
   },
-  addBtn: {
-    marginTop: 10,
-    backgroundColor: "#4F46E5",
-    paddingVertical: 10,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
+
+  qtyTag: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     flexDirection: "row",
-    gap: 6,
+    alignItems: "center",
+    gap: 4,
   },
-  addText: { color: "#fff", fontWeight: "900" },
+  qtyTagText: {
+    fontWeight: "900",
+    color: "#0F766E",
+    fontSize: 12,
+  },
 
   empty: {
     textAlign: "center",
     marginTop: 40,
     color: "#94A3B8",
+    fontWeight: "800",
   },
 
   modalOverlay: {

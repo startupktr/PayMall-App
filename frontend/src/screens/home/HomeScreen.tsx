@@ -168,6 +168,7 @@ export default function HomeScreen({ navigation }: any) {
   const MIN_DISTANCE_TO_REFETCH_METERS = 200;
 
   const fetchingLocationRef = useRef(false);
+  const showMallSkeleton = !hasLoadedOnce && (mallsLoading || malls.length === 0);
 
   /* ================= KEYBOARD LISTENER ================= */
 
@@ -288,7 +289,8 @@ export default function HomeScreen({ navigation }: any) {
     } else {
       setLoading(false);
       setRefreshing(false);
-      setMallsLoading(false);
+
+      if (hasLoadedOnce) setMallsLoading(false);
     }
   };
 
@@ -415,7 +417,7 @@ export default function HomeScreen({ navigation }: any) {
           </Text>
 
           {/* ✅ Shimmer skeleton */}
-          {mallsLoading ? (
+          {showMallSkeleton ? (
             <ShimmerMallGrid isDark={isDark} />
           ) : (
             <>
