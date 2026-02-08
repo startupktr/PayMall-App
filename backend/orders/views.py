@@ -648,227 +648,494 @@ class OrderInvoiceDataView(APIView):
         return Response(response_data, status=status.HTTP_200_OK)
 
 
+# class OrderInvoiceView(APIView):
+#     """
+#     Original PDF generation endpoint (kept for backward compatibility)
+#     GET /api/orders/{pk}/invoice/
+#     """
+#     permission_classes = [permissions.IsAuthenticated]
+
+#     def get(self, request, pk):
+#         order = get_object_or_404(
+#             Order.objects.select_related("mall", "user").prefetch_related("items"),
+#             pk=pk,
+#             user=request.user
+#         )
+
+#         mall = order.mall
+
+#         response = HttpResponse(content_type="application/pdf")
+#         response["Content-Disposition"] = f'attachment; filename="invoice_{order.order_number}.pdf"'
+
+#         pdf = canvas.Canvas(response, pagesize=A4)
+#         width, height = A4
+
+#         # =============================
+#         # Helpers
+#         # =============================
+#         def draw_line(y):
+#             pdf.setStrokeColor(colors.HexColor("#CBD5E1"))
+#             pdf.setLineWidth(1)
+#             pdf.line(40, y, width - 40, y)
+
+#         # =============================
+#         # HEADER
+#         # =============================
+#         pdf.setFont("Helvetica-Bold", 16)
+#         pdf.drawString(40, height - 45, safe_str(getattr(mall, "name", "Shopping Mall Superstore")))
+
+#         pdf.setFont("Helvetica", 10)
+#         address = safe_str(getattr(mall, "address", ""))
+#         if address:
+#             pdf.drawString(40, height - 65, address)
+
+#         gstin = safe_str(getattr(mall, "gstin", ""), "")
+#         fssai = safe_str(getattr(mall, "fssai", ""), "")
+
+#         y_top_meta = height - 90
+#         pdf.setFont("Helvetica", 10)
+#         if gstin:
+#             pdf.drawString(40, y_top_meta, f"GSTIN: {gstin}")
+#             y_top_meta -= 16
+#         if fssai:
+#             pdf.drawString(40, y_top_meta, f"FSSAI: {fssai}")
+#             y_top_meta -= 16
+
+#         # Logo text (right side)
+#         pdf.setFont("Helvetica-Bold", 22)
+#         pdf.setFillColor(colors.HexColor("#2563EB"))
+#         pdf.drawRightString(width - 40, height - 55, "PayMall")
+#         pdf.setFillColor(colors.black)
+
+#         draw_line(height - 120)
+
+#         # =============================
+#         # INVOICE TITLE
+#         # =============================
+#         pdf.setFont("Helvetica-Bold", 13)
+#         pdf.drawCentredString(width / 2, height - 150, "TAX INVOICE (IN-STORE PURCHASE)")
+#         draw_line(height - 160)
+
+#         # =============================
+#         # INVOICE META
+#         # =============================
+#         pdf.setFont("Helvetica", 10)
+
+#         invoice_no = f"PM-{order.created_at.strftime('%Y%m%d')}{order.id}"
+#         invoice_date = order.created_at.strftime("%d-%b-%Y")
+
+#         state_code = safe_str(getattr(mall, "state_code", ""), "")
+#         state_name = safe_str(getattr(mall, "state_name", ""), "")
+
+#         place_of_supply = ""
+#         if state_name and state_code:
+#             place_of_supply = f"{state_name} ({state_code})"
+#         elif state_name:
+#             place_of_supply = state_name
+
+#         pdf.drawString(40, height - 190, f"Invoice No: {invoice_no}")
+#         pdf.drawString(40, height - 210, f"Order ID: {order.order_number}")
+#         pdf.drawString(40, height - 230, f"Invoice Date: {invoice_date}")
+#         if place_of_supply:
+#             pdf.drawString(40, height - 250, f"Place of Supply: {place_of_supply}")
+
+#         draw_line(height - 270)
+
+#         # =============================
+#         # BILL TO
+#         # =============================
+#         y_bill = height - 300
+#         pdf.setFont("Helvetica-Bold", 11)
+#         pdf.setFillColor(colors.HexColor("#2563EB"))
+#         pdf.drawString(40, y_bill, "BILL TO")
+#         pdf.setFillColor(colors.black)
+
+#         pdf.setFont("Helvetica", 10)
+#         pdf.drawString(40, y_bill - 25, f"Customer Name: {safe_str(getattr(order.user, 'full_name', None) or getattr(order.user, 'email', 'Customer'))}")
+#         phone = safe_str(getattr(order.user, "phone_number", ""), "")
+#         if phone:
+#             pdf.drawString(40, y_bill - 45, f"Mobile: +91 {phone}")
+
+#         # =============================
+#         # ITEMS TABLE
+#         # =============================
+#         table_y = y_bill - 95
+
+#         data = [["#", "Item", "HSN", "Qty", "Rate", "CGST", "SGST", "Total"]]
+
+#         items = order.items.select_related("product").all()
+#         for idx, item in enumerate(items, start=1):
+#             product = getattr(item, "product", None)
+
+#             hsn = ""
+#             if product and hasattr(product, "hsn_code"):
+#                 hsn = safe_str(product.hsn_code, "")
+#             elif hasattr(item, "hsn_code"):
+#                 hsn = safe_str(item.hsn_code, "")
+
+#             qty = safe_str(item.quantity, "1")
+
+#             rate = safe_str(getattr(item, "product_price", ""), "0.00")
+#             cgst_amt = safe_str(getattr(item, "cgst_amount", ""), "0.00")
+#             sgst_amt = safe_str(getattr(item, "sgst_amount", ""), "0.00")
+#             total_amt = safe_str(getattr(item, "total_price", ""), "0.00")
+
+#             data.append([
+#                 str(idx),
+#                 safe_str(item.product_name, ""),
+#                 hsn,
+#                 str(qty),
+#                 str(rate),
+#                 str(cgst_amt),
+#                 str(sgst_amt),
+#                 str(total_amt),
+#             ])
+
+#         table = Table(data, colWidths=[20, 170, 45, 35, 55, 55, 55, 60])
+
+#         table.setStyle(TableStyle([
+#             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E3A8A")),
+#             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+#             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+#             ("FONTSIZE", (0, 0), (-1, 0), 10),
+
+#             ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+#             ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+#             ("FONTSIZE", (0, 1), (-1, -1), 9),
+
+#             ("ALIGN", (0, 0), (0, -1), "CENTER"),
+#             ("ALIGN", (2, 0), (3, -1), "CENTER"),
+#             ("ALIGN", (4, 1), (-1, -1), "RIGHT"),
+
+#             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+#             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
+#         ]))
+
+#         table.wrapOn(pdf, width, height)
+#         table_height = 18 * (len(data) + 1)
+#         table.drawOn(pdf, 40, table_y - table_height)
+
+#         # =============================
+#         # TOTALS SUMMARY
+#         # =============================
+#         y_summary = table_y - table_height - 30
+
+#         item_total = safe_str(getattr(order, "subtotal", "0.00"), "0.00")
+#         cgst_total = safe_str(getattr(order, "cgst", "0.00"), "0.00")
+#         sgst_total = safe_str(getattr(order, "sgst", "0.00"), "0.00")
+#         invoice_value = safe_str(getattr(order, "total", "0.00"), "0.00")
+
+#         pdf.setFont("Helvetica-Bold", 10)
+#         pdf.drawRightString(width - 40, y_summary, f"Item Total:      ₹{item_total}")
+#         pdf.drawRightString(width - 40, y_summary - 16, f"CGST:           ₹{cgst_total}")
+#         pdf.drawRightString(width - 40, y_summary - 32, f"SGST:           ₹{sgst_total}")
+#         pdf.drawRightString(width - 40, y_summary - 52, f"Invoice Value:  ₹{invoice_value}")
+
+#         # =============================
+#         # PAYMENT DETAILS
+#         # =============================
+#         y_pay = y_summary - 90
+#         pdf.setFont("Helvetica", 10)
+
+#         payment_mode = safe_str(getattr(order, "payment_method", "UPI"), "UPI")
+#         pdf.setFillColor(colors.HexColor("#2563EB"))
+#         pdf.drawString(40, y_pay, f"Payment Mode: {payment_mode}")
+#         pdf.setFillColor(colors.black)
+
+#         tx = safe_str(getattr(order, "gateway_payment_id", ""), "")
+#         if tx:
+#             pdf.setFillColor(colors.HexColor("#2563EB"))
+#             pdf.drawString(40, y_pay - 18, f"Transaction ID: {tx}")
+#             pdf.setFillColor(colors.black)
+
+#         draw_line(y_pay - 35)
+
+#         # =============================
+#         # FOOTER
+#         # =============================
+#         pdf.setFont("Helvetica-Oblique", 9)
+#         pdf.drawString(40, y_pay - 55, "This is a system-generated invoice for an in-store purchase.")
+
+#         pdf.setFont("Helvetica-Bold", 10)
+#         pdf.drawString(40, y_pay - 85, "Seller")
+#         pdf.setFont("Helvetica", 9)
+#         pdf.drawString(40, y_pay - 105, safe_str(getattr(mall, "name", "PayMall Store")))
+#         if address:
+#             pdf.drawString(40, y_pay - 120, address)
+
+#         pdf.setFont("Helvetica-Bold", 10)
+#         pdf.drawString(40, y_pay - 150, "Platform:")
+#         pdf.setFont("Helvetica", 9)
+#         pdf.drawString(40, y_pay - 165, "PayMall Technologies Pvt. Ltd.")
+#         pdf.drawString(40, y_pay - 180, "Made in India 🇮🇳")
+
+#         pdf.showPage()
+#         pdf.save()
+#         return response
+
+
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404
+from rest_framework.views import APIView
+from rest_framework import permissions
+
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
+    Image,
+)
+from reportlab.lib import colors
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import inch
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase import pdfmetrics
+
+from reportlab.platypus import PageBreak
+from reportlab.pdfgen import canvas
+
+import os
+import qrcode
+from io import BytesIO
+from django.conf import settings
+
+
 class OrderInvoiceView(APIView):
-    """
-    Original PDF generation endpoint (kept for backward compatibility)
-    GET /api/orders/{pk}/invoice/
-    """
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, pk):
         order = get_object_or_404(
-            Order.objects.select_related("mall", "user").prefetch_related("items"),
+            Order.objects.select_related("mall", "user")
+            .prefetch_related("items__product"),
             pk=pk,
-            user=request.user
+            user=request.user,
         )
+
+        response = HttpResponse(content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f'attachment; filename="invoice_{order.order_number}.pdf"'
+        )
+
+        doc = SimpleDocTemplate(
+            response,
+            pagesize=A4,
+            rightMargin=40,
+            leftMargin=40,
+            topMargin=40,
+            bottomMargin=40,
+        )
+
+        elements = []
+        styles = getSampleStyleSheet()
+
+        # ========================================
+        # HEADER SECTION
+        # ========================================
 
         mall = order.mall
 
-        response = HttpResponse(content_type="application/pdf")
-        response["Content-Disposition"] = f'attachment; filename="invoice_{order.order_number}.pdf"'
+        header_table_data = []
 
-        pdf = canvas.Canvas(response, pagesize=A4)
-        width, height = A4
+        # LEFT SIDE (Mall Info)
+        left_header = f"""
+        <b>{mall.name}</b><br/>
+        {mall.address}<br/>
+        GSTIN: {getattr(mall, "gstin", "")}<br/>
+        FSSAI: {getattr(mall, "fssai", "")}
+        """
 
-        # =============================
-        # Helpers
-        # =============================
-        def draw_line(y):
-            pdf.setStrokeColor(colors.HexColor("#CBD5E1"))
-            pdf.setLineWidth(1)
-            pdf.line(40, y, width - 40, y)
+        left_paragraph = Paragraph(left_header, styles["Normal"])
 
-        # =============================
-        # HEADER
-        # =============================
-        pdf.setFont("Helvetica-Bold", 16)
-        pdf.drawString(40, height - 45, safe_str(getattr(mall, "name", "Shopping Mall Superstore")))
+        # RIGHT SIDE (Logo)
+        logo_path = os.path.join(
+            settings.BASE_DIR, "static/images/logo.png"
+        )
 
-        pdf.setFont("Helvetica", 10)
-        address = safe_str(getattr(mall, "address", ""))
-        if address:
-            pdf.drawString(40, height - 65, address)
+        if os.path.exists(logo_path):
+            logo = Image(logo_path, width=120, height=40)
+        else:
+            logo = Paragraph("<b>PayMall</b>", styles["Title"])
 
-        gstin = safe_str(getattr(mall, "gstin", ""), "")
-        fssai = safe_str(getattr(mall, "fssai", ""), "")
+        header_table_data.append([left_paragraph, logo])
 
-        y_top_meta = height - 90
-        pdf.setFont("Helvetica", 10)
-        if gstin:
-            pdf.drawString(40, y_top_meta, f"GSTIN: {gstin}")
-            y_top_meta -= 16
-        if fssai:
-            pdf.drawString(40, y_top_meta, f"FSSAI: {fssai}")
-            y_top_meta -= 16
+        header_table = Table(header_table_data, colWidths=[350, 120])
+        elements.append(header_table)
+        elements.append(Spacer(1, 20))
 
-        # Logo text (right side)
-        pdf.setFont("Helvetica-Bold", 22)
-        pdf.setFillColor(colors.HexColor("#2563EB"))
-        pdf.drawRightString(width - 40, height - 55, "PayMall")
-        pdf.setFillColor(colors.black)
+        # ========================================
+        # TITLE
+        # ========================================
 
-        draw_line(height - 120)
+        title = Paragraph(
+            "<b>TAX INVOICE (IN-STORE PURCHASE)</b>",
+            styles["Heading2"],
+        )
+        elements.append(title)
+        elements.append(Spacer(1, 20))
 
-        # =============================
-        # INVOICE TITLE
-        # =============================
-        pdf.setFont("Helvetica-Bold", 13)
-        pdf.drawCentredString(width / 2, height - 150, "TAX INVOICE (IN-STORE PURCHASE)")
-        draw_line(height - 160)
-
-        # =============================
+        # ========================================
         # INVOICE META
-        # =============================
-        pdf.setFont("Helvetica", 10)
+        # ========================================
 
         invoice_no = f"PM-{order.created_at.strftime('%Y%m%d')}{order.id}"
         invoice_date = order.created_at.strftime("%d-%b-%Y")
 
-        state_code = safe_str(getattr(mall, "state_code", ""), "")
-        state_name = safe_str(getattr(mall, "state_name", ""), "")
+        meta_data = [
+            ["Invoice No:", invoice_no],
+            ["Order ID:", order.order_number],
+            ["Invoice Date:", invoice_date],
+            [
+                "Place of Supply:",
+                f"{getattr(mall, 'state_name', '')} ({getattr(mall, 'state_code', '')})",
+            ],
+        ]
 
-        place_of_supply = ""
-        if state_name and state_code:
-            place_of_supply = f"{state_name} ({state_code})"
-        elif state_name:
-            place_of_supply = state_name
+        meta_table = Table(meta_data, colWidths=[150, 300])
+        elements.append(meta_table)
+        elements.append(Spacer(1, 25))
 
-        pdf.drawString(40, height - 190, f"Invoice No: {invoice_no}")
-        pdf.drawString(40, height - 210, f"Order ID: {order.order_number}")
-        pdf.drawString(40, height - 230, f"Invoice Date: {invoice_date}")
-        if place_of_supply:
-            pdf.drawString(40, height - 250, f"Place of Supply: {place_of_supply}")
-
-        draw_line(height - 270)
-
-        # =============================
+        # ========================================
         # BILL TO
-        # =============================
-        y_bill = height - 300
-        pdf.setFont("Helvetica-Bold", 11)
-        pdf.setFillColor(colors.HexColor("#2563EB"))
-        pdf.drawString(40, y_bill, "BILL TO")
-        pdf.setFillColor(colors.black)
+        # ========================================
 
-        pdf.setFont("Helvetica", 10)
-        pdf.drawString(40, y_bill - 25, f"Customer Name: {safe_str(getattr(order.user, 'full_name', None) or getattr(order.user, 'email', 'Customer'))}")
-        phone = safe_str(getattr(order.user, "phone_number", ""), "")
-        if phone:
-            pdf.drawString(40, y_bill - 45, f"Mobile: +91 {phone}")
+        bill_to = Paragraph("<b>BILL TO</b>", styles["Heading3"])
+        elements.append(bill_to)
+        elements.append(Spacer(1, 10))
 
-        # =============================
+        customer_name = (
+            getattr(order.user, "full_name", None)
+            or getattr(order.user, "email", "Customer")
+        )
+
+        bill_info = [
+            ["Customer Name:", customer_name],
+            ["Mobile:", getattr(order.user, "phone_number", "")],
+        ]
+
+        bill_table = Table(bill_info, colWidths=[150, 300])
+        elements.append(bill_table)
+        elements.append(Spacer(1, 20))
+
+        # ========================================
         # ITEMS TABLE
-        # =============================
-        table_y = y_bill - 95
+        # ========================================
 
         data = [["#", "Item", "HSN", "Qty", "Rate", "CGST", "SGST", "Total"]]
 
-        items = order.items.select_related("product").all()
+        items = order.items.all()
+
         for idx, item in enumerate(items, start=1):
-            product = getattr(item, "product", None)
+            product = item.product
 
-            hsn = ""
-            if product and hasattr(product, "hsn_code"):
-                hsn = safe_str(product.hsn_code, "")
-            elif hasattr(item, "hsn_code"):
-                hsn = safe_str(item.hsn_code, "")
+            data.append(
+                [
+                    str(idx),
+                    item.product_name,
+                    getattr(product, "hsn_code", ""),
+                    str(item.quantity),
+                    f"{float(item.product_price):,.2f}",
+                    f"{float(item.cgst_amount):,.2f}",
+                    f"{float(item.sgst_amount):,.2f}",
+                    f"{float(item.total_price):,.2f}",
+                ]
+            )
 
-            qty = safe_str(item.quantity, "1")
+        table = Table(data, repeatRows=1)
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E3A8A")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                    ("ALIGN", (3, 1), (-1, -1), "RIGHT"),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
+                ]
+            )
+        )
 
-            rate = safe_str(getattr(item, "product_price", ""), "0.00")
-            cgst_amt = safe_str(getattr(item, "cgst_amount", ""), "0.00")
-            sgst_amt = safe_str(getattr(item, "sgst_amount", ""), "0.00")
-            total_amt = safe_str(getattr(item, "total_price", ""), "0.00")
+        elements.append(table)
+        elements.append(Spacer(1, 20))
 
-            data.append([
-                str(idx),
-                safe_str(item.product_name, ""),
-                hsn,
-                str(qty),
-                str(rate),
-                str(cgst_amt),
-                str(sgst_amt),
-                str(total_amt),
-            ])
+        # ========================================
+        # TOTAL SUMMARY
+        # ========================================
 
-        table = Table(data, colWidths=[20, 170, 45, 35, 55, 55, 55, 60])
+        summary_data = [
+            ["Item Total:", f"₹{float(order.subtotal):,.2f}"],
+            ["CGST:", f"₹{float(order.cgst):,.2f}"],
+            ["SGST:", f"₹{float(order.sgst):,.2f}"],
+            ["Invoice Value:", f"₹{float(order.total):,.2f}"],
+        ]
 
-        table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E3A8A")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, 0), 10),
+        summary_table = Table(summary_data, colWidths=[350, 120])
+        elements.append(summary_table)
+        elements.append(Spacer(1, 20))
 
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
-            ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-            ("FONTSIZE", (0, 1), (-1, -1), 9),
-
-            ("ALIGN", (0, 0), (0, -1), "CENTER"),
-            ("ALIGN", (2, 0), (3, -1), "CENTER"),
-            ("ALIGN", (4, 1), (-1, -1), "RIGHT"),
-
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
-        ]))
-
-        table.wrapOn(pdf, width, height)
-        table_height = 18 * (len(data) + 1)
-        table.drawOn(pdf, 40, table_y - table_height)
-
-        # =============================
-        # TOTALS SUMMARY
-        # =============================
-        y_summary = table_y - table_height - 30
-
-        item_total = safe_str(getattr(order, "subtotal", "0.00"), "0.00")
-        cgst_total = safe_str(getattr(order, "cgst", "0.00"), "0.00")
-        sgst_total = safe_str(getattr(order, "sgst", "0.00"), "0.00")
-        invoice_value = safe_str(getattr(order, "total", "0.00"), "0.00")
-
-        pdf.setFont("Helvetica-Bold", 10)
-        pdf.drawRightString(width - 40, y_summary, f"Item Total:      ₹{item_total}")
-        pdf.drawRightString(width - 40, y_summary - 16, f"CGST:           ₹{cgst_total}")
-        pdf.drawRightString(width - 40, y_summary - 32, f"SGST:           ₹{sgst_total}")
-        pdf.drawRightString(width - 40, y_summary - 52, f"Invoice Value:  ₹{invoice_value}")
-
-        # =============================
+        # ========================================
         # PAYMENT DETAILS
-        # =============================
-        y_pay = y_summary - 90
-        pdf.setFont("Helvetica", 10)
+        # ========================================
 
-        payment_mode = safe_str(getattr(order, "payment_method", "UPI"), "UPI")
-        pdf.setFillColor(colors.HexColor("#2563EB"))
-        pdf.drawString(40, y_pay, f"Payment Mode: {payment_mode}")
-        pdf.setFillColor(colors.black)
+        payment_data = [
+            ["Payment Mode:", order.payment_method],
+            ["Transaction ID:", getattr(order, "gateway_payment_id", "")],
+        ]
 
-        tx = safe_str(getattr(order, "gateway_payment_id", ""), "")
-        if tx:
-            pdf.setFillColor(colors.HexColor("#2563EB"))
-            pdf.drawString(40, y_pay - 18, f"Transaction ID: {tx}")
-            pdf.setFillColor(colors.black)
+        payment_table = Table(payment_data, colWidths=[150, 300])
+        elements.append(payment_table)
+        elements.append(Spacer(1, 25))
 
-        draw_line(y_pay - 35)
+        # ========================================
+        # QR CODE (Verification)
+        # ========================================
 
-        # =============================
+        qr = qrcode.make(f"Order ID: {order.order_number}")
+        qr_buffer = BytesIO()
+        qr.save(qr_buffer)
+        qr_buffer.seek(0)
+
+        qr_image = Image(qr_buffer, width=100, height=100)
+        elements.append(qr_image)
+        elements.append(Spacer(1, 20))
+
+        # ========================================
         # FOOTER
-        # =============================
-        pdf.setFont("Helvetica-Oblique", 9)
-        pdf.drawString(40, y_pay - 55, "This is a system-generated invoice for an in-store purchase.")
+        # ========================================
 
-        pdf.setFont("Helvetica-Bold", 10)
-        pdf.drawString(40, y_pay - 85, "Seller")
-        pdf.setFont("Helvetica", 9)
-        pdf.drawString(40, y_pay - 105, safe_str(getattr(mall, "name", "PayMall Store")))
-        if address:
-            pdf.drawString(40, y_pay - 120, address)
+        footer_text = Paragraph(
+            "This is a system-generated invoice for an in-store purchase.",
+            styles["Normal"],
+        )
+        elements.append(footer_text)
+        elements.append(Spacer(1, 10))
 
-        pdf.setFont("Helvetica-Bold", 10)
-        pdf.drawString(40, y_pay - 150, "Platform:")
-        pdf.setFont("Helvetica", 9)
-        pdf.drawString(40, y_pay - 165, "PayMall Technologies Pvt. Ltd.")
-        pdf.drawString(40, y_pay - 180, "Made in India 🇮🇳")
+        seller_info = Paragraph(
+            f"<b>Seller</b><br/>{mall.name}<br/>{mall.address}",
+            styles["Normal"],
+        )
+        elements.append(seller_info)
+        elements.append(Spacer(1, 10))
 
-        pdf.showPage()
-        pdf.save()
+        platform_info = Paragraph(
+            "<b>Platform:</b><br/>PayMall Technologies Pvt. Ltd.<br/>Made in India 🇮🇳",
+            styles["Normal"],
+        )
+        elements.append(platform_info)
+
+        # ========================================
+        # BUILD DOCUMENT (Auto Page Handling)
+        # ========================================
+
+        def add_watermark(canvas_obj, doc_obj):
+            canvas_obj.saveState()
+            canvas_obj.setFont("Helvetica", 50)
+            canvas_obj.setFillColor(colors.lightgrey)
+            canvas_obj.rotate(45)
+            canvas_obj.drawCentredString(300, 0, "PayMall")
+            canvas_obj.restoreState()
+
+        doc.build(elements, onFirstPage=add_watermark, onLaterPages=add_watermark)
+
         return response
