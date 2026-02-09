@@ -52,16 +52,7 @@ class MergeGuestCartView(APIView):
 
     @transaction.atomic
     def post(self, request):
-        """
-        Expected payload:
-        {
-          "mall_id": "<mall_uuid>",
-          "items": [
-            {"product_id": "<uuid/int>", "quantity": 2},
-            {"product_id": "<uuid/int>", "quantity": 1}
-          ]
-        }
-        """
+        
         mall_id = request.data.get("mall_id")
         items = request.data.get("items", [])
 
@@ -72,6 +63,9 @@ class MergeGuestCartView(APIView):
             return error_response(message="items must be a list", status=400)
 
         cart = get_active_cart(request.user, mall_id)
+
+        had_existing_items = cart.items.exists()
+        merged_count = 0
 
         for i in items:
             product_id = i.get("product_id")
@@ -103,11 +97,17 @@ class MergeGuestCartView(APIView):
             item_obj.quantity = new_qty
             item_obj.save()
 
+            merged_count += 1
+
         cart.refresh_from_db()
 
         return success_response(
             message="Guest cart merged",
-            data=CartSerializer(cart, context={"request": request}).data,
+            data={
+                "cart": CartSerializer(cart, context={"request": request}).data,
+                "had_existing_items": had_existing_items,
+                "merged_count": merged_count,
+            },
             status=status.HTTP_200_OK,
         )
 
