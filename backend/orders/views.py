@@ -190,355 +190,6 @@ class OrderCheckoutView(APIView):
             data=OrderDetailSerializer(order).data,
             status=status.HTTP_201_CREATED,
         )
-
-
-
-# class OrderCreateView(APIView):
-#     permission_classes = [permissions.IsAuthenticated]
-
-#     @transaction.atomic
-#     def post(self, request):
-#         mall_id = request.data.get("mall_id")
-#         print(mall_id)
-#         if not mall_id:
-#             return error_response(
-#                 message="mall_id is required",
-#                 status=status.HTTP_400_BAD_REQUEST,
-#             )
-        
-#         cart = (
-#             Cart.objects
-#             .select_for_update()
-#             .filter(user=request.user, status="ACTIVE", mall_id=mall_id)
-#             .select_related("mall")
-#             .prefetch_related("items__product")
-#             .first()
-#         )
-#         print(cart)
-#         if not cart or not cart.items.exists():
-#             return error_response(
-#                 message="Cart is empty",
-#                 status=status.HTTP_400_BAD_REQUEST,
-#             )
-
-#         existing = Order.objects.filter(
-#             user=request.user,
-#             status="PAYMENT_PENDING",
-#             mall=cart.mall
-#         ).first()
-
-#         if existing:
-#             return success_response(
-#                 message="Pending order already exists",
-#                 data=OrderDetailSerializer(existing).data,
-#                 status=status.HTTP_200_OK,
-#             )
-
-#         taxable_total = Decimal("0.00")
-#         gst_total = Decimal("0.00")
-#         cgst_total = Decimal("0.00")
-#         sgst_total = Decimal("0.00")
-#         payable_total = Decimal("0.00")
-
-#         order = Order.objects.create(
-#             user=request.user,
-#             mall=cart.mall,
-#             order_number=f"ORD-{uuid.uuid4().hex[:12].upper()}",
-#             status="PAYMENT_PENDING",
-#             payment_status="PENDING",
-#             subtotal=Decimal("0.00"),
-#             tax=Decimal("0.00"),
-#             total=Decimal("0.00"),
-#             cgst=Decimal("0.00"),
-#             sgst=Decimal("0.00"),
-#             igst=Decimal("0.00"),
-#             payment_expires_at=timezone.now() + timedelta(minutes=15),
-#         )
-
-#         for item in cart.items.select_related("product").all():
-#             p = item.product
-#             qty = Decimal(item.quantity)
-
-#             # ✅ inclusive pricing
-#             unit_price_inclusive = Decimal(p.price)
-#             line_total_inclusive = unit_price_inclusive * qty
-
-#             gst_rate = Decimal(getattr(p, "gst_rate", Decimal("0.00")))
-
-#             unit_taxable, unit_gst, unit_cgst, unit_sgst = split_gst_inclusive(
-#                 inclusive_amount=unit_price_inclusive,
-#                 gst_rate=gst_rate,
-#             )
-
-#             line_taxable = unit_taxable * qty
-#             line_gst = unit_gst * qty
-#             line_cgst = unit_cgst * qty
-#             line_sgst = unit_sgst * qty
-
-#             taxable_total += line_taxable
-#             gst_total += line_gst
-#             cgst_total += line_cgst
-#             sgst_total += line_sgst
-#             payable_total += line_total_inclusive
-
-#             OrderItem.objects.create(
-#                 order=order,
-#                 product=p,
-#                 product_name=p.name,
-#                 product_price=money(unit_price_inclusive),
-#                 product_barcode=p.barcode,
-#                 quantity=item.quantity,
-#                 gst_rate=money(gst_rate),
-#                 taxable_value=money(line_taxable),
-#                 tax_amount=money(line_gst),
-#                 cgst_amount=money(line_cgst),
-#                 sgst_amount=money(line_sgst),
-#                 total_price=money(line_total_inclusive),
-#             )
-
-#         order.subtotal = money(taxable_total)
-#         order.tax = money(gst_total)
-#         order.cgst = money(cgst_total)
-#         order.sgst = money(sgst_total)
-#         order.total = money(payable_total)
-#         order.save()
-
-#         # ❌ DON'T CONVERT CART STATUS (causes UNIQUE crashes + guest cart issues)
-#         # cart.status = "CONVERTED"
-#         # cart.save(update_fields=["status"])
-
-#         return success_response(
-#             message="Order created (GST inclusive)",
-#             data=OrderDetailSerializer(order).data,
-#             status=status.HTTP_201_CREATED,
-#         )
-
-
-# def safe_str(x, fallback=""):
-#     return str(x) if x is not None else fallback
-
-
-# class OrderInvoiceView(APIView):
-#     permission_classes = [permissions.IsAuthenticated]
-
-#     def get(self, request, pk):
-#         order = get_object_or_404(
-#             Order.objects.select_related("mall", "user").prefetch_related("items"),
-#             pk=pk,
-#             user=request.user
-#         )
-
-#         mall = order.mall
-
-#         response = HttpResponse(content_type="application/pdf")
-#         response["Content-Disposition"] = f'attachment; filename="invoice_{order.order_number}.pdf"'
-
-#         pdf = canvas.Canvas(response, pagesize=A4)
-#         width, height = A4
-
-#         # =============================
-#         # Helpers
-#         # =============================
-#         def draw_line(y):
-#             pdf.setStrokeColor(colors.HexColor("#CBD5E1"))
-#             pdf.setLineWidth(1)
-#             pdf.line(40, y, width - 40, y)
-
-#         # =============================
-#         # HEADER
-#         # =============================
-#         pdf.setFont("Helvetica-Bold", 16)
-#         pdf.drawString(40, height - 45, safe_str(getattr(mall, "name", "Shopping Mall Superstore")))
-
-#         pdf.setFont("Helvetica", 10)
-#         address = safe_str(getattr(mall, "address", ""))
-#         if address:
-#             pdf.drawString(40, height - 65, address)
-
-#         gstin = safe_str(getattr(mall, "gstin", ""), "")
-#         fssai = safe_str(getattr(mall, "fssai", ""), "")
-
-#         y_top_meta = height - 90
-#         pdf.setFont("Helvetica", 10)
-#         if gstin:
-#             pdf.drawString(40, y_top_meta, f"GSTIN: {gstin}")
-#             y_top_meta -= 16
-#         if fssai:
-#             pdf.drawString(40, y_top_meta, f"FSSAI: {fssai}")
-#             y_top_meta -= 16
-
-#         # Logo text (right side)
-#         pdf.setFont("Helvetica-Bold", 22)
-#         pdf.setFillColor(colors.HexColor("#2563EB"))
-#         pdf.drawRightString(width - 40, height - 55, "PayMall")
-#         pdf.setFillColor(colors.black)
-
-#         draw_line(height - 120)
-
-#         # =============================
-#         # INVOICE TITLE
-#         # =============================
-#         pdf.setFont("Helvetica-Bold", 13)
-#         pdf.drawCentredString(width / 2, height - 150, "TAX INVOICE (IN-STORE PURCHASE)")
-#         draw_line(height - 160)
-
-#         # =============================
-#         # INVOICE META
-#         # =============================
-#         pdf.setFont("Helvetica", 10)
-
-#         invoice_no = f"PM-{order.created_at.strftime('%Y%m%d')}{order.id}"
-#         invoice_date = order.created_at.strftime("%d-%b-%Y")
-
-#         state_code = safe_str(getattr(mall, "state_code", ""), "")
-#         state_name = safe_str(getattr(mall, "state_name", ""), "")
-
-#         place_of_supply = ""
-#         if state_name and state_code:
-#             place_of_supply = f"{state_name} ({state_code})"
-#         elif state_name:
-#             place_of_supply = state_name
-
-#         pdf.drawString(40, height - 190, f"Invoice No: {invoice_no}")
-#         pdf.drawString(40, height - 210, f"Order ID: {order.order_number}")
-#         pdf.drawString(40, height - 230, f"Invoice Date: {invoice_date}")
-#         if place_of_supply:
-#             pdf.drawString(40, height - 250, f"Place of Supply: {place_of_supply}")
-
-#         draw_line(height - 270)
-
-#         # =============================
-#         # BILL TO
-#         # =============================
-#         y_bill = height - 300
-#         pdf.setFont("Helvetica-Bold", 11)
-#         pdf.setFillColor(colors.HexColor("#2563EB"))
-#         pdf.drawString(40, y_bill, "BILL TO")
-#         pdf.setFillColor(colors.black)
-
-#         pdf.setFont("Helvetica", 10)
-#         pdf.drawString(40, y_bill - 25, f"Customer Name: {safe_str(getattr(order.user, 'full_name', None) or getattr(order.user, 'email', 'Customer'))}")
-#         phone = safe_str(getattr(order.user, "phone_number", ""), "")
-#         if phone:
-#             pdf.drawString(40, y_bill - 45, f"Mobile: +91 {phone}")
-
-#         # =============================
-#         # ITEMS TABLE
-#         # =============================
-#         table_y = y_bill - 95
-
-#         data = [["#", "Item", "HSN", "Qty", "Rate", "CGST", "SGST", "Total"]]
-
-#         items = order.items.select_related("product").all()
-#         for idx, item in enumerate(items, start=1):
-#             product = getattr(item, "product", None)
-
-#             hsn = ""
-#             if product and hasattr(product, "hsn_code"):
-#                 hsn = safe_str(product.hsn_code, "")
-#             elif hasattr(item, "hsn_code"):
-#                 hsn = safe_str(item.hsn_code, "")
-
-#             qty = safe_str(item.quantity, "1")
-
-#             rate = safe_str(getattr(item, "product_price", ""), "0.00")
-#             cgst_amt = safe_str(getattr(item, "cgst_amount", ""), "0.00")
-#             sgst_amt = safe_str(getattr(item, "sgst_amount", ""), "0.00")
-#             total_amt = safe_str(getattr(item, "total_price", ""), "0.00")
-
-#             data.append([
-#                 str(idx),
-#                 safe_str(item.product_name, ""),
-#                 hsn,
-#                 str(qty),
-#                 str(rate),
-#                 str(cgst_amt),
-#                 str(sgst_amt),
-#                 str(total_amt),
-#             ])
-
-#         table = Table(data, colWidths=[20, 170, 45, 35, 55, 55, 55, 60])
-
-#         table.setStyle(TableStyle([
-#             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E3A8A")),
-#             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-#             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-#             ("FONTSIZE", (0, 0), (-1, 0), 10),
-
-#             ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
-#             ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-#             ("FONTSIZE", (0, 1), (-1, -1), 9),
-
-#             ("ALIGN", (0, 0), (0, -1), "CENTER"),
-#             ("ALIGN", (2, 0), (3, -1), "CENTER"),
-#             ("ALIGN", (4, 1), (-1, -1), "RIGHT"),
-
-#             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-#             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
-#         ]))
-
-#         table.wrapOn(pdf, width, height)
-#         table_height = 18 * (len(data) + 1)
-#         table.drawOn(pdf, 40, table_y - table_height)
-
-#         # =============================
-#         # TOTALS SUMMARY
-#         # =============================
-#         y_summary = table_y - table_height - 30
-
-#         item_total = safe_str(getattr(order, "subtotal", "0.00"), "0.00")
-#         cgst_total = safe_str(getattr(order, "cgst", "0.00"), "0.00")
-#         sgst_total = safe_str(getattr(order, "sgst", "0.00"), "0.00")
-#         invoice_value = safe_str(getattr(order, "total", "0.00"), "0.00")
-
-#         pdf.setFont("Helvetica-Bold", 10)
-#         pdf.drawRightString(width - 40, y_summary, f"Item Total:      ₹{item_total}")
-#         pdf.drawRightString(width - 40, y_summary - 16, f"CGST:           ₹{cgst_total}")
-#         pdf.drawRightString(width - 40, y_summary - 32, f"SGST:           ₹{sgst_total}")
-#         pdf.drawRightString(width - 40, y_summary - 52, f"Invoice Value:  ₹{invoice_value}")
-
-#         # =============================
-#         # PAYMENT DETAILS
-#         # =============================
-#         y_pay = y_summary - 90
-#         pdf.setFont("Helvetica", 10)
-
-#         payment_mode = safe_str(getattr(order, "payment_method", "UPI"), "UPI")
-#         pdf.setFillColor(colors.HexColor("#2563EB"))
-#         pdf.drawString(40, y_pay, f"Payment Mode: {payment_mode}")
-#         pdf.setFillColor(colors.black)
-
-#         tx = safe_str(getattr(order, "gateway_payment_id", ""), "")
-#         if tx:
-#             pdf.setFillColor(colors.HexColor("#2563EB"))
-#             pdf.drawString(40, y_pay - 18, f"Transaction ID: {tx}")
-#             pdf.setFillColor(colors.black)
-
-#         draw_line(y_pay - 35)
-
-#         # =============================
-#         # FOOTER
-#         # =============================
-#         pdf.setFont("Helvetica-Oblique", 9)
-#         pdf.drawString(40, y_pay - 55, "This is a system-generated invoice for an in-store purchase.")
-
-#         pdf.setFont("Helvetica-Bold", 10)
-#         pdf.drawString(40, y_pay - 85, "Seller")
-#         pdf.setFont("Helvetica", 9)
-#         pdf.drawString(40, y_pay - 105, safe_str(getattr(mall, "name", "PayMall Store")))
-#         if address:
-#             pdf.drawString(40, y_pay - 120, address)
-
-#         pdf.setFont("Helvetica-Bold", 10)
-#         pdf.drawString(40, y_pay - 150, "Platform:")
-#         pdf.setFont("Helvetica", 9)
-#         pdf.drawString(40, y_pay - 165, "PayMall Technologies Pvt. Ltd.")
-#         pdf.drawString(40, y_pay - 180, "Made in India 🇮🇳")
-
-#         pdf.showPage()
-#         pdf.save()
-#         return response
-
     
 class OrderCancelView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -675,10 +326,29 @@ class OrderInvoiceView(APIView):
         # -----------------------------------
         # REGISTER FONT (₹ support)
         # -----------------------------------
-        font_path = os.path.join(settings.BASE_DIR, "static/fonts/DejaVuSans.ttf")
-        pdfmetrics.registerFont(TTFont("DejaVu", font_path))
+        fonts_dir = os.path.join(settings.BASE_DIR, "static", "fonts")
 
-        pdf.setFont("DejaVu", 10)
+        # Define the fallback-safe variables
+        FONT_NORMAL = "Helvetica"
+        FONT_BOLD = "Helvetica-Bold"
+
+        # Try to register Normal Font
+        try:
+            normal_font_path = os.path.join(fonts_dir, "DejaVuSans.ttf")
+            pdfmetrics.registerFont(TTFont("DejaVu", normal_font_path))
+            FONT_NORMAL = "DejaVu"
+        except Exception as e:
+            print(f"Error loading DejaVuSans: {e}")
+
+        # Try to register Bold Font
+        try:
+            bold_font_path = os.path.join(fonts_dir, "DejaVuSans-Bold.ttf")
+            pdfmetrics.registerFont(TTFont("DejaVu-Bold", bold_font_path))
+            FONT_BOLD = "DejaVu-Bold"
+        except Exception as e:
+            print(f"Error loading DejaVuSans-Bold: {e}")
+
+        pdf.setFont(FONT_NORMAL, 10)
 
         mall = order.mall
 
@@ -687,10 +357,10 @@ class OrderInvoiceView(APIView):
         # -----------------------------------
         y = height - 50
 
-        pdf.setFont("DejaVu", 14)
+        pdf.setFont(FONT_BOLD, 14)
         pdf.drawString(40, y, mall.name)
 
-        pdf.setFont("DejaVu", 10)
+        pdf.setFont(FONT_NORMAL, 10)
         pdf.drawString(40, y - 18, mall.address or "")
 
         pdf.drawString(40, y - 36, f"GSTIN: {getattr(mall, 'gstin', '')}")
@@ -713,18 +383,21 @@ class OrderInvoiceView(APIView):
 
         # LINE
         pdf.setStrokeColor(colors.grey)
-        pdf.line(40, height - 100, width - 40, height - 100)
+        pdf.line(40, height - 110, width - 40, height - 110)
 
         # -----------------------------------
         # TITLE
         # -----------------------------------
-        pdf.setFont("DejaVu", 12)
-        pdf.drawCentredString(width / 2, height - 120, "TAX INVOICE (IN-STORE PURCHASE)")
-        pdf.line(40, height - 130, width - 40, height - 130)
+        pdf.setFont(FONT_BOLD, 12)
+        
+        pdf.drawCentredString(width / 2, height - 130, "TAX INVOICE (IN-STORE PURCHASE)")
+        pdf.line(40, height - 140, width - 40, height - 140)
 
         # -----------------------------------
         # META
         # -----------------------------------
+        pdf.setFont(FONT_NORMAL, 12)
+
         invoice_no = f"PM-{order.created_at.strftime('%Y%m%d')}{order.id}"
         invoice_date = order.created_at.strftime("%d-%b-%Y")
 
@@ -798,7 +471,7 @@ class OrderInvoiceView(APIView):
         # -----------------------------------
         summary_y = table_y - table_height - 30
 
-        pdf.setFont("DejaVu", 10)
+        pdf.setFont(FONT_NORMAL, 10)
 
         pdf.drawRightString(width - 40, summary_y, f"Item Total: ₹{order.subtotal:.2f}")
         pdf.drawRightString(width - 40, summary_y - 18, f"CGST: ₹{order.cgst:.2f}")
@@ -807,7 +480,7 @@ class OrderInvoiceView(APIView):
         pdf.drawRightString(width - 40, summary_y - 36, f"SGST: ₹{order.sgst:.2f}")
         pdf.line(width - 200, summary_y - 40, width - 40, summary_y - 40)
 
-        pdf.setFont("DejaVu", 11)
+        pdf.setFont(FONT_NORMAL, 11)
         pdf.drawRightString(width - 40, summary_y - 60, f"Invoice Value: ₹{order.total:.2f}")
 
         pdf.line(40, summary_y - 80, width - 40, summary_y - 80)
@@ -841,7 +514,7 @@ class OrderInvoiceView(APIView):
         # -----------------------------------
         pdf.drawString(40, pay_y - 120, "This is a system-generated invoice for an in-store purchase.")
 
-        pdf.setFont("DejaVu", 10)
+        pdf.setFont(FONT_NORMAL, 10)
         pdf.drawString(40, pay_y - 150, "Seller")
         pdf.drawString(40, pay_y - 165, mall.name)
         pdf.drawString(40, pay_y - 180, mall.address or "")
