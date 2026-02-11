@@ -11,35 +11,26 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ===============================
 # ENV DETECTION (ADD ONLY)
 # ===============================
-ENV = os.getenv("ENV", "production")
+ENV = os.getenv("ENV", "development")
 IS_PRODUCTION = ENV == "production"
 
 # ===============================
 # SECURITY
 # ===============================
 SECRET_KEY = os.getenv("SECRET_KEY")
-DEBUG = os.getenv("DEBUG", "False") == "True"
+DEBUG = not IS_PRODUCTION
+
+if not SECRET_KEY:
+    raise ValueError("SECRET_KEY not set in environment")
 
 # ===============================
 # ALLOWED HOSTS (ADD DEV IP SUPPORT)
 # ===============================
-ALLOWED_HOSTS = [
-    "api.paymall.live",
-    "paymall.live",
-    "merchant.paymall.live",
-    "www.paymall.live",
-    "localhost",
-    "127.0.0.1",
-]
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
 
-# ===============================
-# DEV-ONLY HOST ALLOW (SAFE)
-# ===============================
-if os.getenv("ENV") == "development":
-    ALLOWED_HOSTS += [
-        "192.168.0.165",   # your PC LAN IP
-        "0.0.0.0",
-    ]
+if not ALLOWED_HOSTS or ALLOWED_HOSTS == [""]:
+    ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+
 
 # ===============================
 # APPLICATIONS
@@ -139,59 +130,38 @@ SIMPLE_JWT = {
     "AUTH_COOKIE_REFRESH": "refresh_token",
 
     # 🔒 PROD SAFE (UNCHANGED)
-    "AUTH_COOKIE_SECURE": True,
+    "AUTH_COOKIE_SECURE": IS_PRODUCTION,
     "AUTH_COOKIE_HTTP_ONLY": True,
     "AUTH_COOKIE_PATH": "/",
-    "AUTH_COOKIE_SAMESITE": "None",
+    "AUTH_COOKIE_SAMESITE": "None" if IS_PRODUCTION else "Lax",
+    "AUTH_COOKIE_DOMAIN": ".paymall.live" if IS_PRODUCTION else None,
+
 }
 
-# ===============================
-# CORS (PROD UNCHANGED)
-# ===============================
-CORS_ALLOWED_ORIGINS = [
-    "https://paymall.live",
-    "https://www.paymall.live",
-    "https://merchant.paymall.live",
-    "http://localhost:8080",
-    "http://127.0.0.1:8080",
-]
-
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = False
 
-CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^null$",
-]
-
-# ===============================
-# CSRF (PROD UNCHANGED)
-# ===============================
-CSRF_TRUSTED_ORIGINS = [
-    "https://paymall.live",
-    "https://www.paymall.live",
-    "https://merchant.paymall.live",
-    "https://api.paymall.live",
-    "http://localhost:8080",
-    "http://127.0.0.1:8080",
-]
-
-CSRF_COOKIE_SECURE = True
-CSRF_COOKIE_SAMESITE = "None"
-
-# ===============================
-# DEV-ONLY OVERRIDES (SAFE)
-# ===============================
-if not IS_PRODUCTION:
-    # 🔓 allow Expo / mobile / LAN
+if IS_PRODUCTION:
+    CORS_ALLOW_ALL_ORIGINS = False
+    CORS_ALLOWED_ORIGINS = os.getenv(
+        "CORS_ALLOWED_ORIGINS", ""
+    ).split(",")
+else:
     CORS_ALLOW_ALL_ORIGINS = True
 
-    # 🔓 allow HTTP cookies in dev
-    CSRF_COOKIE_SECURE = False
-    SESSION_COOKIE_SECURE = False
+if IS_PRODUCTION:
+    CSRF_TRUSTED_ORIGINS = os.getenv(
+        "CSRF_TRUSTED_ORIGINS", ""
+    ).split(",")
+else:
+    CSRF_TRUSTED_ORIGINS = [
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+    ]
 
-    # 🔓 allow JWT cookies over HTTP
-    SIMPLE_JWT["AUTH_COOKIE_SECURE"] = False
-    SIMPLE_JWT["AUTH_COOKIE_SAMESITE"] = "Lax"
+
+CSRF_COOKIE_SECURE = IS_PRODUCTION
+CSRF_COOKIE_SAMESITE = "None" if IS_PRODUCTION else "Lax"
+SESSION_COOKIE_SECURE = IS_PRODUCTION
 
 # ===============================
 # STATIC / MEDIA
@@ -205,3 +175,9 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+if IS_PRODUCTION:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_HTTPONLY = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
