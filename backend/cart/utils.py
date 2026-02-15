@@ -6,19 +6,14 @@ from .models import Cart
 
 
 @transaction.atomic
-def get_active_cart(user, mall_or_id):
-
-    if isinstance(mall_or_id, Mall):
-        mall = mall_or_id
-    else:
-        mall = get_object_or_404(Mall, id=mall_or_id)
-
-    cart, _ = Cart.objects.select_for_update().get_or_create(
-        user=user,
-        mall=mall,
-        status="ACTIVE",
+def get_active_cart(user):
+    return (
+        Cart.objects
+        .select_for_update()
+        .filter(user=user, status="ACTIVE")
+        .first()
     )
-    return cart
+
 
 
 def money(x: Decimal) -> Decimal:

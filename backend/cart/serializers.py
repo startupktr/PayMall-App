@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Cart, CartItem
+from .models import Cart, CartItem, SavedCart, SavedCartItem
 from products.serializers import ProductSerializer
 from .utils import split_gst_inclusive, money
 from decimal import Decimal
@@ -89,3 +89,24 @@ class CartSerializer(serializers.ModelSerializer):
 
     def get_sgst(self, obj):
         return self._calculate_breakup(obj)["sgst_total"]
+    
+class SavedCartItemSerializer(serializers.ModelSerializer):
+    product = ProductSerializer(read_only=True)
+
+    class Meta:
+        model = SavedCartItem
+        fields = ("id", "product", "quantity")
+
+class SavedCartSerializer(serializers.ModelSerializer):
+    items = SavedCartItemSerializer(many=True, read_only=True)
+    mall_name = serializers.CharField(source="mall.name", read_only=True)
+
+    class Meta:
+        model = SavedCart
+        fields = (
+            "id",
+            "mall",
+            "mall_name",
+            "items",
+            "created_at",
+        )

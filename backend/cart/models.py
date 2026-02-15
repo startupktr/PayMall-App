@@ -25,27 +25,14 @@ class Cart(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["user", "mall"],
+                fields=["user"],
                 condition=Q(status="ACTIVE"),
-                name="unique_active_cart_per_user_mall",
+                name="unique_active_cart_per_user",
             )
         ]
         indexes = [
             models.Index(fields=["user", "status"]),
-            models.Index(fields=["user", "mall"]),
         ]
-    
-    # @property
-    # def total_items(self):
-    #     return self.items.count()
-    
-    # @property
-    # def subtotal(self):
-    #     return sum((item.total_price for item in self.items.all()), Decimal("0.00"))
-    
-    # @property
-    # def total_amount(self):
-    #     return self.subtotal
 
     def __str__(self):
         return f"{self.user} - {self.mall}"
@@ -70,3 +57,28 @@ class CartItem(models.Model):
     def total_price(self):
         return (self.product.price * self.quantity)
 
+class SavedCart(models.Model):
+    user = models.ForeignKey("accounts.User", on_delete=models.CASCADE)
+    mall = models.ForeignKey(Mall, on_delete=models.CASCADE)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user"]),
+        ]
+
+    def __str__(self):
+        return f"SavedCart - {self.user} - {self.mall}"
+
+class SavedCartItem(models.Model):
+    saved_cart = models.ForeignKey(
+        SavedCart,
+        related_name="items",
+        on_delete=models.CASCADE
+    )
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField(default=1)
+
+    def __str__(self):
+        return f"{self.product.name} ({self.quantity})"

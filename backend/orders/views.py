@@ -71,13 +71,9 @@ class OrderCheckoutView(APIView):
 
     @transaction.atomic
     def post(self, request):
-        mall_id = request.data.get("mall_id")
-        if not mall_id:
-            return error_response("mall_id is required", status=status.HTTP_400_BAD_REQUEST)
-
         cart = (
             Cart.objects.select_for_update()
-            .filter(user=request.user, status="ACTIVE", mall_id=mall_id)
+            .filter(user=request.user, status="ACTIVE")
             .select_related("mall")
             .prefetch_related("items__product")
             .first()
